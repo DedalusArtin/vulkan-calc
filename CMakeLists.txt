@@ -13,6 +13,12 @@ if(WIN32)
     set(RC_SRC ${CMAKE_CURRENT_SOURCE_DIR}/resources.rc)
 endif()
 
+# MSVC: source files are UTF-8 (fixes Chinese chars in codepage 936)
+if(MSVC)
+    add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
+    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+endif()
+
 # Find dependencies
 find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
