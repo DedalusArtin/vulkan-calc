@@ -49,7 +49,7 @@ if(WIN32)
             DEPENDS ${RC_SRC}
             COMMENT "Compiling resources"
         )
-        add_executable(vulkan_crc WIN32 ${SOURCES} ${IMGUI_SRC} ${RES_OUT})
+        add_executable(vulkan_calc WIN32 ${SOURCES} ${IMGUI_SRC} ${RES_OUT})
     else()
         add_executable(vulkan_calc WIN32 ${SOURCES} ${IMGUI_SRC})
     endif()
