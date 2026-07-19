@@ -1,4 +1,4 @@
-#ifndef MATH_ENGINE_HPP
+﻿#ifndef MATH_ENGINE_HPP
 #define MATH_ENGINE_HPP
 
 #include <complex>
