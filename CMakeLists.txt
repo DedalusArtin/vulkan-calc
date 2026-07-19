@@ -15,8 +15,8 @@ endif()
 
 # MSVC: source files are UTF-8 (fixes Chinese chars in codepage 936)
 if(MSVC)
-    add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
-    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+    add_compile_options(/utf-8)
+    add_compile_options(/wd4819)
 endif()
 
 # Find dependencies
