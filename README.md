@@ -1,3 +1,5 @@
+这是一个完全由AI编写的工具
+
 # VulkanCalc — Vulkan 加速的高级科学计算器
 
 ![Language](https://img.shields.io/badge/C%2B%2B-20-blue)
