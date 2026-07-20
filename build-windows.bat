@@ -2,7 +2,8 @@
 setlocal enabledelayedexpansion
 
 set PROJECT_DIR=%~dp0
-set BUILD_DIR=%PROJECT_DIR%build-windows
+set PROJECT_DIR=%PROJECT_DIR:~0,-1%
+set BUILD_DIR=%PROJECT_DIR%\build-windows
 set OUTPUT_DIR=F:\vulkan-calc
 
 echo ========================================
@@ -18,31 +19,36 @@ if "%VULKAN_SDK%"=="" (
 if "%VULKAN_SDK%"=="" echo [ERROR] Vulkan SDK not found & pause & exit /b 1
 echo [OK] Vulkan SDK: %VULKAN_SDK%
 
-REM ---- vcpkg (override VS2022's default, prefer user's install) ----
-if exist "E:\Programming\vcpkg" (
-    set VCPKG_ROOT=E:\Programming\vcpkg
-) else if exist "C:\vcpkg" (
-    set VCPKG_ROOT=C:\vcpkg
-)
+REM ---- vcpkg ----
+if exist "E:\Programming\vcpkg" set VCPKG_ROOT=E:\Programming\vcpkg
+if exist "C:\vcpkg" set VCPKG_ROOT=C:\vcpkg
 if not "%VCPKG_ROOT%"=="" echo [OK] vcpkg: %VCPKG_ROOT%
 
 REM ---- Build dir ----
 if not exist "%BUILD_DIR%" mkdir "%BUILD_DIR%"
 cd /d "%BUILD_DIR%"
 
-REM ---- CMake (all on one line, no ^) ----
+REM ---- CMake init cache (use forward slashes, avoid batch escaping issues) ----
 echo [..] Configuring...
-if not "%VCPKG_ROOT%"=="" (
-    cmake "%PROJECT_DIR%" -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="%VULKAN_SDK%" -DVULKAN_SDK="%VULKAN_SDK%" "-DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake"
-) else (
-    cmake "%PROJECT_DIR%" -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="%VULKAN_SDK%" -DVULKAN_SDK="%VULKAN_SDK%"
-)
-if ERRORLEVEL 1 echo [ERROR] CMake config failed & pause & exit /b 1
+set VK_DIR=%VULKAN_SDK:\=/%
+echo set(CMAKE_PREFIX_PATH "%VK_DIR%") > "%BUILD_DIR%\initCache.cmake"
+echo set(VULKAN_SDK "%VK_DIR%") >> "%BUILD_DIR%\initCache.cmake"
 
+if not "%VCPKG_ROOT%"=="" (
+    set VCPKG_DIR=%VCPKG_ROOT:\=/%
+    rem Use escaped parens to avoid batch if-block ending
+    echo set(CMAKE_TOOLCHAIN_FILE "%VCPKG_DIR%/scripts/buildsystems/vcpkg.cmake"^) >> "%BUILD_DIR%\initCache.cmake"
+)
+
+cmake -C "%BUILD_DIR%\initCache.cmake" -G "Visual Studio 17 2022" -A x64 "%PROJECT_DIR%"
+if ERRORLEVEL 1 echo [ERROR] Config failed & pause & exit /b 1
+
+REM ---- Build ----
 echo [..] Building...
 cmake --build . --config Release --parallel
 if ERRORLEVEL 1 echo [ERROR] Build failed & pause & exit /b 1
 
+REM ---- Copy ----
 echo [..] Copying...
 if not exist "%OUTPUT_DIR%" mkdir "%OUTPUT_DIR%"
 copy /Y "%BUILD_DIR%\Release\vulkan_calc.exe" "%OUTPUT_DIR%\"
