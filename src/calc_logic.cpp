@@ -51,11 +51,107 @@ std::string applyAngleMode(const std::string& expr, AngleMode mode) {
     return result;
 }
 
+// Preprocess expression: replace function aliases and convert constants to numeric values
+void calcPreprocessExpression(std::string& expr) {
+    // Replace π character with "pi" text (which the evaluator already handles)
+    {
+        size_t pos = 0;
+        while ((pos = expr.find("π", pos)) != std::string::npos) {
+            expr.replace(pos, 3, "pi");  // π is 3 bytes in UTF-8
+            pos += 2;
+        }
+    }
+
+    // Replace function aliases (user-facing → evaluator-supported)
+    struct AliasMap {
+        const char* alias;
+        const char* standard;
+    };
+    const AliasMap aliases[] = {
+        {"arcsin(", "asin("},
+        {"arccos(", "acos("},
+        {"arctan(", "atan("},
+        {"arcsinh(", "asinh("},
+        {"arccosh(", "acosh("},
+        {"arctanh(", "atanh("},
+        {"sinh(",   "sinh("},
+        {"cosh(",   "cosh("},
+        {"tanh(",   "tanh("},
+        {"log2(",   "log2("},
+        {"log10(",  "log("},  // log10 → log (base 10 evaluator)
+        {"loge(",   "ln("},   // natural log
+        {"cbrt(",   "cbrt("},
+        {"floor(",  "floor("},
+        {"ceil(",   "ceil("},
+        {"round(",  "round("},
+    };
+    for (const auto& a : aliases) {
+        size_t pos = 0;
+        while ((pos = expr.find(a.alias, pos)) != std::string::npos) {
+            expr.replace(pos, strlen(a.alias), a.standard);
+            pos += strlen(a.standard);
+        }
+    }
+
+    // Replace standalone "pi" with high-precision numeric value
+    // This ensures sin(pi) → sin(3.141592653589793) which evaluates precisely
+    {
+        size_t pos = 0;
+        while ((pos = expr.find("pi", pos)) != std::string::npos) {
+            bool standalone = true;
+            if (pos > 0 && std::isalpha((unsigned char)expr[pos-1])) standalone = false;
+            size_t endPos = pos + 2;
+            if (endPos < expr.size() && std::isalpha((unsigned char)expr[endPos])) standalone = false;
+            if (standalone) {
+                expr.replace(pos, 2, "3.141592653589793");
+                pos += 16;
+            } else {
+                pos += 2;
+            }
+        }
+    }
+
+    // Replace standalone "e" (Euler's number, not scientific notation like 1e5) with numeric value
+    {
+        size_t pos = 0;
+        while ((pos = expr.find('e', pos)) != std::string::npos) {
+            bool isEuler = true;
+            if (pos > 0) {
+                char prev = expr[pos-1];
+                if (std::isdigit((unsigned char)prev) || prev == '.') {
+                    isEuler = false; // scientific notation like 1e5
+                }
+            }
+            size_t endPos = pos + 1;
+            if (endPos < expr.size()) {
+                char next = expr[endPos];
+                if (std::isalpha((unsigned char)next) || next == '(') {
+                    isEuler = false; // part of function name
+                }
+            }
+            if (isEuler) {
+                expr.replace(pos, 1, "2.718281828459045");
+                pos += 17;
+            } else {
+                pos += 1;
+            }
+        }
+    }
+}
+
+// Set keyboard flash feedback
+void calcTriggerKeyFlash() {
+    g_state.keyFlashTimer = 8; // ~8 frames of highlight
+}
+
 // Evaluate current expression
 void calcEvaluate() {
     if (g_state.display.empty()) return;
 
     std::string expr = g_state.display;
+
+    // Preprocess: replace function aliases and constants with numeric values
+    calcPreprocessExpression(expr);
 
     // Apply factorial
     calcApplyFactorial(expr);
@@ -119,6 +215,7 @@ void calcClear() {
     g_state.result.clear();
     g_state.error.clear();
     g_state.hasResult = false;
+    g_state.inputBuf[0] = '\0';
 }
 
 // Delete last character
@@ -158,9 +255,9 @@ void calcInsertConstant(const std::string& name) {
     }
 
     if (name == "pi") {
-        g_state.display += "pi";
+        g_state.display += "3.141592653589793";
     } else if (name == "e") {
-        g_state.display += "e";
+        g_state.display += "2.718281828459045";
     } else if (name == "c") {
         g_state.display += "299792458";
     } else if (name == "h") {
@@ -238,6 +335,8 @@ void calcApplyPercent(std::string& expr) {
 
 // Keyboard input
 void calcKeyboardInput(int key, int mods) {
+    calcTriggerKeyFlash();
+
     // Reset hasResult for digit/function input
     auto startFresh = [&]() {
         if (g_state.hasResult) {
@@ -249,7 +348,6 @@ void calcKeyboardInput(int key, int mods) {
     // Digits
     if (key >= '0' && key <= '9') {
         startFresh();
-        // If last char was ')' or result was just shown, start fresh
         g_state.display += (char)key;
         return;
     }
@@ -339,12 +437,15 @@ void calcKeyboardInput(int key, int mods) {
     if (key == 'l') { startFresh(); g_state.display += "log("; return; }
     if (key == 'n') { startFresh(); g_state.display += "ln("; return; }
     if (key == 'r') { startFresh(); g_state.display += "sqrt("; return; }
-    if (key == 'e') { startFresh(); g_state.display += "e"; return; }  // e constant
-    if (key == 'p') { startFresh(); g_state.display += "pi"; return; } // pi
+    // p and e now insert numeric constant values directly
+    if (key == 'e') { startFresh(); g_state.display += "2.718281828459045"; return; }
+    if (key == 'p') { startFresh(); g_state.display += "3.141592653589793"; return; }
 }
 
 // Handle button press from UI
 void calcOnButton(const std::string& label) {
+    calcTriggerKeyFlash();
+
     if (label == "AC") {
         calcClear();
         return;
@@ -384,7 +485,6 @@ void calcOnButton(const std::string& label) {
 
     // Number base indicator (for display only in the current implementation)
     if (label == "DEC" || label == "HEX" || label == "BIN" || label == "OCT") {
-        // Toggle would go here — for now display only
         return;
     }
 
@@ -398,14 +498,27 @@ void calcOnButton(const std::string& label) {
         return;
     }
 
-    // 'e' button (euler's number)
-    if (label == "e" && g_state.display.find("e") == std::string::npos) {
-        // Simple check — if display ends with something that makes "e" a constant
+    // '(' and ')' as direct labels
+    if (label == "(") {
         if (g_state.hasResult) {
             g_state.display.clear();
             g_state.hasResult = false;
         }
-        g_state.display += "e";
+        g_state.display += "(";
+        return;
+    }
+    if (label == ")") {
+        g_state.display += ")";
+        return;
+    }
+
+    // 'e' button (euler's number)
+    if (label == "e") {
+        if (g_state.hasResult) {
+            g_state.display.clear();
+            g_state.hasResult = false;
+        }
+        g_state.display += "2.718281828459045";
         return;
     }
 

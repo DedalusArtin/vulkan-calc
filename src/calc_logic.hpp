@@ -37,3 +37,9 @@ std::string applyAngleMode(const std::string& expr, AngleMode mode);
 
 // Keyboard input
 void calcKeyboardInput(int key, int mods);
+
+// Preprocess expression: replace function aliases and constants
+void calcPreprocessExpression(std::string& expr);
+
+// Set keyboard flash feedback
+void calcTriggerKeyFlash();

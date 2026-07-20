@@ -32,8 +32,9 @@ int main() {
         return 1;
     }
 
-    // Make window fixed-size (non-resizable)
-    glfwSetWindowAttrib(renderer.window(), GLFW_RESIZABLE, GLFW_FALSE);
+    // Make window resizable with minimum size
+    glfwSetWindowAttrib(renderer.window(), GLFW_RESIZABLE, GLFW_TRUE);
+    glfwSetWindowSizeLimits(renderer.window(), 400, 600, GLFW_DONT_CARE, GLFW_DONT_CARE);
 
     GLFWwindow* w = renderer.window();
 

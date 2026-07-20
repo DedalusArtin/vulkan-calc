@@ -50,6 +50,15 @@ struct CalcState {
     // History (max 20)
     std::deque<HistoryEntry> history;
 
+    // Keyboard flash feedback timer
+    int keyFlashTimer = 0;
+
+    // Manual input buffer (for InputText LCD)
+    char inputBuf[1024] = "";
+
+    // Font size: 0=small, 1=medium, 2=large
+    int fontSize = 1;
+
     // Panel visibility
     bool showHistory = false;
     bool showConstants = false;
