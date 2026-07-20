@@ -11,6 +11,16 @@
 #include <cstring>
 #include <cstdio>
 
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
 // Global state instance
 CalcState g_state;
 
@@ -23,6 +33,14 @@ static void check_vk_result(VkResult err) {
 }
 
 int main() {
+#ifdef _WIN32
+    // Allocate console for debug messages on Windows
+    AllocConsole();
+    freopen("CONOUT$", "w", stdout);
+    freopen("CONOUT$", "w", stderr);
+    std::cout << "VulkanCalc 2.0 starting..." << std::endl;
+#endif
+
     // --- Detect language ---
     g_state.lang = detectLang();
 
@@ -111,16 +129,7 @@ int main() {
     ImFontGlyphRangesBuilder rangeBuilder;
     rangeBuilder.AddRanges(io.Fonts->GetGlyphRangesDefault());
     rangeBuilder.AddRanges(io.Fonts->GetGlyphRangesGreek());
-    rangeBuilder.AddRanges(io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
-    // Add any additional CJK characters needed for the UI
-    rangeBuilder.AddChar(U'\u51FD'); // 函 (function)
-    rangeBuilder.AddChar(U'\u5F27'); // 弧 (radian arc)
-    rangeBuilder.AddChar(U'\u5FAE'); // 微 (calculus)
-    rangeBuilder.AddChar(U'\u79EF'); // 积 (integral)
-    rangeBuilder.AddChar(U'\u5BFC'); // 导 (derivative)
-    rangeBuilder.AddChar(U'\u6982'); // 概 (probability)
-    rangeBuilder.AddChar(U'\u7387'); // 率 (probability)
-    rangeBuilder.AddChar(U'\u7EDF'); // 统 (statistics)
+    rangeBuilder.AddRanges(io.Fonts->GetGlyphRangesChineseFull());
     // Also add specific math symbols
     rangeBuilder.AddChar(U'\u03C0'); // π
     rangeBuilder.AddChar(U'\u222B'); // ∫ integral
@@ -256,8 +265,9 @@ int main() {
 
     // ============================================================
     // MAIN LOOP
-    // ============================================================
+    // --- Main loop ---
     while (!glfwWindowShouldClose(w)) {
+        try {
         glfwPollEvents();
 
         int fbw, fbh;
@@ -348,6 +358,11 @@ int main() {
         pi.pSwapchains = &renderer.m_swapchain;
         pi.pImageIndices = &ii;
         vkQueuePresentKHR(renderer.m_presentQueue, &pi);
+    } catch (const std::exception& e) {
+        std::cerr << "FATAL: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "FATAL: Unknown exception" << std::endl;
+    }
     }
 
     vkDeviceWaitIdle(renderer.m_device);
