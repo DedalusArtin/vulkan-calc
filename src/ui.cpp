@@ -2083,13 +2083,13 @@ void renderAdvancedTabContent() {
                 g_state.surfIsDragging = false;
             }
         }
-        ImGui::EndChild();
         
-        // Enlarge button for 3D view
-        ImGui::SameLine();
-        if (ImGui::Button(T("[+] 全屏##3dzoom", "[+] 全屏##3dzoom", "[+] 全画面##3dzoom"), ImVec2(80, 28))) {
+        // Enlarge 3D view button (inside child window, at bottom)
+        ImGui::Separator();
+        if (ImGui::Button(T("[+] Fullscreen##3dzoom", "[+] 全屏查看##3dzoom", "[+] 全画面##3dzoom"), ImVec2(140, 30))) {
             g_state.showLarge3D = true;
         }
+        ImGui::EndChild();
     }
 
     // ---- Extension Tab ----

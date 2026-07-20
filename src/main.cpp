@@ -91,7 +91,9 @@ int main() {
                                 int ih = *(int*)(bmp + 8) / 2;
                                 int bpp = *(short*)(bmp + 14);
                                 if (bpp == 32 && iw > 0 && ih > 0 && iw <= 128 && ih <= 128) {
-                                    int dataOff = *(int*)(bmp + 10);
+                                    // For ICO BMP entries, pixel data starts at BITMAPINFOHEADER size (40)
+                                    // For 32bpp there's no palette, so dataOff = 40
+                                    int dataOff = 40;
                                     unsigned char* rgba = new unsigned char[iw * ih * 4];
                                     for (int y = 0; y < ih; y++) {
                                         for (int x = 0; x < iw; x++) {

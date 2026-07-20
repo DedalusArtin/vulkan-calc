@@ -1300,10 +1300,17 @@ void calcToggleLang() {
 
 // Fetch exchange rates from open.er-api.com (free, no API key needed)
 bool fetchExchangeRates() {
+#ifdef _WIN32
+    std::string json = execShellAll(
+        "curl -s --connect-timeout 5 --max-time 10 "
+        "\"https://open.er-api.com/v6/latest/USD\" 2>nul"
+    );
+#else
     std::string json = execShellAll(
         "curl -s --connect-timeout 5 --max-time 10 "
         "\"https://open.er-api.com/v6/latest/USD\""
     );
+#endif
 
     if (json.empty()) {
         if (g_state.exchangeRates.empty()) {
