@@ -1194,6 +1194,16 @@ void renderAdvancedTabContent() {
                     ImGui::SetTooltip("%s",
                         T("Click to expand plot", "点击放大图像", "クリックして拡大"));
                 }
+                
+                // Explicit "Enlarge" button below the plot
+                ImGui::SetCursorScreenPos(ImVec2(po.x, po.y + ps.y + 4));
+                if (ImGui::Button(T("🔍 Enlarge##expBtn", "🔍 放大##expBtn", "🔍 拡大##expBtn"), ImVec2(80, 24))) {
+                    g_state.showLargePlot = true;
+                    g_state.largePlotXMin = xMin; g_state.largePlotXMax = xMax;
+                    g_state.largePlotYMin = yMin; g_state.largePlotYMax = yMax;
+                    g_state.largePlotDirty = true;
+                    g_state.largePlotData = g_state.plots;
+                }
             }
         }
         ImGui::EndChild();
@@ -1970,7 +1980,7 @@ void renderAdvancedTabContent() {
                              g_state.rot3DX, g_state.rot3DY, g_state.zoom3D);
             }
 
-            // ---- Mouse orbit control: invisible button over the drawing area ----
+            // Invisible button for orbit control
             ImGui::SetCursorScreenPos(o);
             ImGui::InvisibleButton("##surfDrag", sz);
             if (ImGui::IsItemHovered()) {
@@ -2008,6 +2018,12 @@ void renderAdvancedTabContent() {
             }
         }
         ImGui::EndChild();
+        
+        // Enlarge button for 3D view
+        ImGui::SameLine();
+        if (ImGui::Button(T("🔍 FullScreen##3dzoom", "🔍 全屏##3dzoom", "🔍 全画面##3dzoom"), ImVec2(80, 28))) {
+            g_state.showLarge3D = true;
+        }
     }
 
     // ---- Extension Tab ----
