@@ -134,17 +134,11 @@ if(WIN32)
     endif()
 
     if(RC_COMPILER)
-        # MSVC-style rc.exe (preferred for MSVC builds)
-        set(RES_OUT ${CMAKE_CURRENT_BINARY_DIR}/resources.res)
-        add_custom_command(
-            OUTPUT ${RES_OUT}
-            COMMAND ${RC_COMPILER} /fo ${RES_OUT} ${RC_SRC}
-            DEPENDS ${RC_SRC}
-            COMMENT "Compiling resources (rc.exe)"
-        )
-        add_executable(vulkan_calc ${PROJECT_SRC} ${PROJECT_HDR} ${IMGUI_SRC} ${RES_OUT})
+        # Let CMake handle MSVC resource compilation automatically
+        add_executable(vulkan_calc ${PROJECT_SRC} ${PROJECT_HDR} ${IMGUI_SRC} ${RC_SRC})
+        message(STATUS "Using MSVC resource compiler: ${RC_COMPILER}")
     elseif(WINDRES)
-        # MinGW-style windres
+        # MinGW-style windres (manual compilation)
         set(RES_OUT ${CMAKE_CURRENT_BINARY_DIR}/resources.res)
         add_custom_command(
             OUTPUT ${RES_OUT}

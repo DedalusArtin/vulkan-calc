@@ -1,4 +1,4 @@
-IDI_APP ICON "icon/app.ico"
+100 ICON "icon/app.ico"
 
 VS_VERSION_INFO VERSIONINFO
 FILEVERSION     2,0,0,0

@@ -39,6 +39,66 @@ int main() {
 
     GLFWwindow* w = renderer.window();
 
+    // Set window icon from .ico file
+    {
+        FILE* ico = fopen("icon/app.ico", "rb");
+        if (ico) {
+            unsigned char header[6];
+            if (fread(header, 1, 6, ico) == 6) {
+                int count = header[4] | (header[5] << 8);
+                if (count > 0) {
+                    // Read the LAST entry (smallest icon, typically 16x16 or 32x32 BMP)
+                    unsigned char entry[16];
+                    int bestIdx = -1, bestSize = 0;
+                    for (int i = 0; i < count; i++) {
+                        fread(entry, 1, 16, ico);
+                        int w = entry[0] ? entry[0] : 256;
+                        int h = entry[1] ? entry[1] : 256;
+                        // Prefer 32x32 or 16x16 BMP icons (not PNG)
+                        if (w <= 48 && h <= 48 && w >= 16 && h >= 16) {
+                            if (w > bestSize) { bestSize = w; bestIdx = i; }
+                        }
+                    }
+                    if (bestIdx >= 0) {
+                        // Re-read the best entry
+                        fseek(ico, 6 + bestIdx * 16, SEEK_SET);
+                        fread(entry, 1, 16, ico);
+                        int imgSize = entry[8]|(entry[9]<<8)|(entry[10]<<16)|(entry[11]<<24);
+                        int imgOff  = entry[12]|(entry[13]<<8)|(entry[14]<<16)|(entry[15]<<24);
+                        if (imgSize > 0 && imgOff > 0) {
+                            unsigned char* bmp = new unsigned char[imgSize];
+                            fseek(ico, imgOff, SEEK_SET);
+                            if ((int)fread(bmp, 1, imgSize, ico) == imgSize) {
+                                int iw = *(int*)(bmp + 4);
+                                int ih = *(int*)(bmp + 8) / 2;
+                                int bpp = *(short*)(bmp + 14);
+                                if (bpp == 32 && iw > 0 && ih > 0 && iw <= 128 && ih <= 128) {
+                                    int dataOff = *(int*)(bmp + 10);
+                                    unsigned char* rgba = new unsigned char[iw * ih * 4];
+                                    for (int y = 0; y < ih; y++) {
+                                        for (int x = 0; x < iw; x++) {
+                                            int src = dataOff + (ih - 1 - y) * iw * 4 + x * 4;
+                                            int dst = (y * iw + x) * 4;
+                                            rgba[dst+0] = bmp[src+2];
+                                            rgba[dst+1] = bmp[src+1];
+                                            rgba[dst+2] = bmp[src+0];
+                                            rgba[dst+3] = bmp[src+3];
+                                        }
+                                    }
+                                    GLFWimage img = { iw, ih, rgba };
+                                    glfwSetWindowIcon(w, 1, &img);
+                                    delete[] rgba;
+                                }
+                            }
+                            delete[] bmp;
+                        }
+                    }
+                }
+            }
+            fclose(ico);
+        }
+    }
+
     // --- Init ImGui ---
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
