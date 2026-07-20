@@ -35,7 +35,7 @@ int main() {
 
     // Make window resizable with minimum size
     glfwSetWindowAttrib(renderer.window(), GLFW_RESIZABLE, GLFW_TRUE);
-    glfwSetWindowSizeLimits(renderer.window(), 400, 600, GLFW_DONT_CARE, GLFW_DONT_CARE);
+    glfwSetWindowSizeLimits(renderer.window(), 480, 600, GLFW_DONT_CARE, GLFW_DONT_CARE);
 
     GLFWwindow* w = renderer.window();
 
@@ -46,44 +46,57 @@ int main() {
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.IniFilename = "imgui.ini";
 
-    // --- Font setup ---
-    // Font sizes for LCD display
-    ImFontConfig cfg;
+    // --- Font setup with Merged Glyph Ranges ---
+    // Build combined glyph ranges: Default (ASCII+Latin) + Greek (for π) + Full CJK
+    ImFontGlyphRangesBuilder rangeBuilder;
+    rangeBuilder.AddRanges(io.Fonts->GetGlyphRangesDefault());
+    rangeBuilder.AddRanges(io.Fonts->GetGlyphRangesGreek());
+    rangeBuilder.AddRanges(io.Fonts->GetGlyphRangesChineseFull());
+    // Also add specific math symbols
+    rangeBuilder.AddChar(U'\u03C0'); // π
+    rangeBuilder.AddChar(U'\u222B'); // ∫ integral
+    rangeBuilder.AddChar(U'\u221E'); // ∞ infinity
+    rangeBuilder.AddChar(U'\u2202'); // ∂ partial derivative
+    rangeBuilder.AddChar(U'\u2207'); // ∇ nabla
+    rangeBuilder.AddChar(U'\u2248'); // ≈ approximately
+    rangeBuilder.AddChar(U'\u2260'); // ≠ not equal
+    rangeBuilder.AddChar(U'\u2264'); // ≤
+    rangeBuilder.AddChar(U'\u2265'); // ≥
+    ImVector<ImWchar> fullRanges;
+    rangeBuilder.BuildRanges(&fullRanges);
 
     // Font 0: Default (10px)
     ImFont* f0 = io.Fonts->AddFontDefault();
 
-    // Font 1: Large bold for result (28px)
-    ImFont* f1 = nullptr;
-    // Font 2: Medium for expression (18px)
-    ImFont* f2 = nullptr;
-    // Font 3: Small for history/status (13px)
-    ImFont* f3 = nullptr;
-    // Font 4: Button font (20px)
-    ImFont* f4 = nullptr;
-
-    // Try CJK font first
+    // Font sizes for various UI elements
+    // Try CJK font first with full ranges
     const char* cjkPath = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc";
     FILE* testFile = fopen(cjkPath, "rb");
+    bool haveCJK = false;
     if (testFile) {
         fclose(testFile);
-        // Load CJK with different sizes - use FULL CJK range for all characters
-        f1 = io.Fonts->AddFontFromFileTTF(cjkPath, 28.0f, nullptr,
-            io.Fonts->GetGlyphRangesChineseFull());
-        f2 = io.Fonts->AddFontFromFileTTF(cjkPath, 16.0f, nullptr,
-            io.Fonts->GetGlyphRangesChineseFull());
-        f3 = io.Fonts->AddFontFromFileTTF(cjkPath, 12.0f, nullptr,
-            io.Fonts->GetGlyphRangesChineseFull());
-        // Font 4: Button font
-        f4 = io.Fonts->AddFontFromFileTTF(cjkPath, 20.0f, nullptr,
-            io.Fonts->GetGlyphRangesChineseFull());
+        haveCJK = true;
     }
 
-    // Fallback to default
-    if (!f1) f1 = io.Fonts->AddFontDefault(); // will be scaled via PushFont
-    if (!f2) f2 = io.Fonts->AddFontDefault();
-    if (!f3) f3 = io.Fonts->AddFontDefault();
-    if (!f4) f4 = io.Fonts->AddFontDefault();
+    // Load all fonts with merged glyph ranges
+    auto loadFont = [&](float size) -> ImFont* {
+        if (haveCJK) {
+            ImFontConfig cfg;
+            cfg.FontNo = 0;
+            ImFont* f = io.Fonts->AddFontFromFileTTF(cjkPath, size, &cfg, fullRanges.Data);
+            if (f) return f;
+        }
+        return io.Fonts->AddFontDefault();
+    };
+
+    // Font 1: Large bold for result (28px)
+    ImFont* f1 = loadFont(28.0f);
+    // Font 2: Medium for expression (16px)
+    ImFont* f2 = loadFont(16.0f);
+    // Font 3: Small for history/status (13px)
+    ImFont* f3 = loadFont(13.0f);
+    // Font 4: Button font (20px)
+    ImFont* f4 = loadFont(20.0f);
 
     // Set default to the 16px CJK or default
     io.FontDefault = f2;

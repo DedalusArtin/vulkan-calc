@@ -79,6 +79,12 @@ struct CalcState {
     bool showConstants = false;
     bool showAdvanced = false;
 
+    // ============================================================
+    // UI redesign: Advanced mode toggle + bottom graph input
+    // ============================================================
+    bool isAdvanced = false;             // Xiaomi-style: Basic ↔ Advanced
+    char graphFunc[256] = "sin(x)";      // Bottom graph expression input
+
     // Expression evaluator (from math_engine)
     ExpressionEvaluator evaluator;
 

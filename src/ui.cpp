@@ -463,21 +463,21 @@ void renderTopBar() {
 
     ImGui::SameLine(0, 4);
 
-    // Advanced button
-    bool advActive = g_state.showAdvanced;
-    if (styledButton(T("ADV", "高级", "応用"),
-                     advActive ? COL_BTN_FUNC : COL_BTN_TOOL,
-                     COL_BTN_TOOL_H, COL_BTN_TOOL_A, ImVec2(56, 26))) {
-        g_state.showAdvanced = !g_state.showAdvanced;
-        if (g_state.showAdvanced) {
+    // --- Xiaomi-style Mode toggle: Basic ↔ Scientific ---
+    if (styledButton(g_state.isAdvanced ? T("标准##md", "标准##md", "標準##md")
+                                        : T("科学##md", "科学##md", "科学##md"),
+                     g_state.isAdvanced ? COL_BTN_FUNC : COL_BTN_TOOL,
+                     COL_BTN_TOOL_H, COL_BTN_TOOL_A, ImVec2(52, 26))) {
+        g_state.isAdvanced = !g_state.isAdvanced;
+        if (g_state.isAdvanced) {
             g_state.showHistory = false;
             g_state.showConstants = false;
         }
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s", T("Fourier / Complex / Calculus",
-                                  "傅里叶 / 复变函数 / 微积分",
-                                  "フーリエ / 複素関数 / 微積分"));
+        ImGui::SetTooltip("%s", T("Switch between Basic and Scientific mode (Xiaomi style)",
+                                  "切换标准/科学模式（小米计算器风格）",
+                                  "標準/科学モードを切替（Xiaomi電卓風）"));
     }
 
     ImGui::SameLine(0, 4);
@@ -538,7 +538,7 @@ void renderTopBar() {
     // Fourier quick button
     if (styledButton(T("F##fb", "傅##fb", "フ##fb"),
                      COL_BTN_TOOL, COL_BTN_TOOL_H, COL_BTN_TOOL_A, ImVec2(28, 26))) {
-        g_state.showAdvanced = true;
+        g_state.isAdvanced = true;
         g_state.showHistory = false;
         g_state.showConstants = false;
         g_state.advTab = 1;
@@ -552,7 +552,7 @@ void renderTopBar() {
     // Complex quick button
     if (styledButton(T("C##cb", "复##cb", "複##cb"),
                      COL_BTN_TOOL, COL_BTN_TOOL_H, COL_BTN_TOOL_A, ImVec2(28, 26))) {
-        g_state.showAdvanced = true;
+        g_state.isAdvanced = true;
         g_state.showHistory = false;
         g_state.showConstants = false;
         g_state.advTab = 2;
@@ -566,7 +566,7 @@ void renderTopBar() {
     // Calculus quick button
     if (styledButton(T("∫##ib", "积##ib", "積##ib"),
                      COL_BTN_TOOL, COL_BTN_TOOL_H, COL_BTN_TOOL_A, ImVec2(28, 26))) {
-        g_state.showAdvanced = true;
+        g_state.isAdvanced = true;
         g_state.showHistory = false;
         g_state.showConstants = false;
         g_state.advTab = 0;
@@ -580,7 +580,7 @@ void renderTopBar() {
     // Probability quick button
     if (styledButton(T("P##pb", "概##pb", "確##pb"),
                      COL_BTN_TOOL, COL_BTN_TOOL_H, COL_BTN_TOOL_A, ImVec2(28, 26))) {
-        g_state.showAdvanced = true;
+        g_state.isAdvanced = true;
         g_state.showHistory = false;
         g_state.showConstants = false;
         g_state.advTab = 4;
@@ -594,7 +594,7 @@ void renderTopBar() {
     // 3D Surface quick button
     if (styledButton(T("3D##3db", "3D##3db", "3D##3db"),
                      COL_BTN_TOOL, COL_BTN_TOOL_H, COL_BTN_TOOL_A, ImVec2(28, 26))) {
-        g_state.showAdvanced = true;
+        g_state.isAdvanced = true;
         g_state.showHistory = false;
         g_state.showConstants = false;
         g_state.advTab = 5;
@@ -608,7 +608,7 @@ void renderTopBar() {
     // Extension quick button
     if (styledButton(T("Ext##eb", "扩##eb", "拡##eb"),
                      COL_BTN_TOOL, COL_BTN_TOOL_H, COL_BTN_TOOL_A, ImVec2(28, 26))) {
-        g_state.showAdvanced = true;
+        g_state.isAdvanced = true;
         g_state.showHistory = false;
         g_state.showConstants = false;
         g_state.advTab = 6;
@@ -881,40 +881,83 @@ static void drawPlot(ImDrawList* dl, ImVec2 o, ImVec2 sz,
     }
 }
 
-void renderAdvancedModal() {
-    if (!g_state.showAdvanced) return;
+// ============================================================
+// Chrome-style Tab Bar for Advanced Mode
+// ============================================================
+void renderChromeTabBar() {
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    ImVec2 pos = ImGui::GetCursorScreenPos();
+    float availW = ImGui::GetContentRegionAvail().x;
 
-    ImGui::SetNextWindowSize(ImVec2(720, 600), ImGuiCond_FirstUseEver);
-    ImGui::Begin(T("Advanced Mode##adv", "高级模式##adv", "応用モード##adv"),
-                 &g_state.showAdvanced);
-
-    // Tabs inside the advanced window
     const char* tabNames[] = {
-        T("Calculus##t0", "微积分##t0", "微積分##t0"),
-        T("Fourier##t1", "傅里叶##t1", "フーリエ##t1"),
-        T("Complex##t2", "复变函数##t2", "複素関数##t2"),
-        T("Domain##t3", "域着色##t3", "領域彩色##t3"),
-        T("ProbStats##t4", "概率统计##t4", "確率統計##t4"),
-        T("3DSurface##t5", "3D曲面##t5", "3D曲面##t5"),
-        T("Ext##t6", "扩展##t6", "拡張##t6")
+        T("Calculus", "微积分", "微積分"),
+        T("Fourier", "傅里叶", "フーリエ"),
+        T("Complex", "复变", "複素"),
+        T("Domain", "域着色", "領域"),
+        T("ProbStat", "概率统计", "確率統計"),
+        T("3D Surf", "3D曲面", "3D曲面"),
+        T("Ext", "扩展", "拡張")
     };
     int tabCount = 7;
+    float tabH = 32.0f;
 
+    // Tab bar background strip
+    dl->AddRectFilled(pos, ImVec2(pos.x + availW, pos.y + tabH), IM_COL32(15, 15, 25, 255));
+
+    float x = pos.x;
     for (int i = 0; i < tabCount; i++) {
-        if (i > 0) ImGui::SameLine();
-        bool sel = (g_state.advTab == i);
-        if (sel) {
-            ImGui::PushStyleColor(ImGuiCol_Button, COL_BTN_FUNC);
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, COL_BTN_FUNC_H);
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, COL_BTN_FUNC_A);
+        float textW = ImGui::CalcTextSize(tabNames[i]).x;
+        float tabW = textW + 20.0f;
+        bool selected = (g_state.advTab == i);
+
+        ImVec2 tabPos(x, pos.y + 2);
+        ImVec2 tabEnd(x + tabW, pos.y + tabH);
+
+        // Chrome-style tab: rounded top corners
+        ImU32 bgCol = selected ? IM_COL32(30, 30, 48, 255) : IM_COL32(20, 20, 34, 200);
+        dl->AddRectFilled(tabPos, tabEnd, bgCol, 6.0f, ImDrawFlags_RoundCornersTop);
+
+        // Active tab bottom accent line
+        if (selected) {
+            dl->AddLine(ImVec2(tabPos.x + 2, tabEnd.y - 1),
+                       ImVec2(tabEnd.x - 2, tabEnd.y - 1),
+                       IM_COL32(80, 200, 255, 255), 2.0f);
         }
-        if (ImGui::Button(tabNames[i])) {
+
+        // Invisible button for click interaction
+        char btnId[32];
+        snprintf(btnId, sizeof(btnId), "##chromeTab%d", i);
+        ImGui::SetCursorScreenPos(tabPos);
+        ImGui::InvisibleButton(btnId, ImVec2(tabW, tabH - 2));
+        bool hovered = ImGui::IsItemHovered();
+        if (ImGui::IsItemActivated()) {
             g_state.advTab = i;
         }
-        if (sel) ImGui::PopStyleColor(3);
-    }
-    ImGui::Separator();
 
+        // Hover highlight
+        if (hovered && !selected) {
+            dl->AddRectFilled(tabPos, tabEnd, IM_COL32(30, 30, 50, 100), 6.0f, ImDrawFlags_RoundCornersTop);
+        }
+
+        // Draw tab label text (Font 3 = 13px fits in 32px height)
+        ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[3]);
+        float tw = ImGui::CalcTextSize(tabNames[i]).x;
+        ImVec2 textPos(x + (tabW - tw) / 2, pos.y + 8);
+        ImU32 textCol = selected ? IM_COL32(230, 230, 245, 255) : IM_COL32(150, 150, 170, 255);
+        dl->AddText(textPos, textCol, tabNames[i]);
+        ImGui::PopFont();
+
+        x += tabW;
+    }
+
+    // Advance cursor below tab bar
+    ImGui::SetCursorScreenPos(ImVec2(pos.x, pos.y + tabH + 4));
+}
+
+// ============================================================
+// Advanced Tab Content (inline — shared by modal and Chrome mode)
+// ============================================================
+void renderAdvancedTabContent() {
     // ---- Calculus Tab ----
     if (g_state.advTab == 0) {
         ImGui::Text("%s", T("Expression f(x) =", "表达式 f(x) =", "式 f(x) ="));
@@ -1851,41 +1894,119 @@ void renderAdvancedModal() {
 
     // ---- Volume Calculation (embedded in calculus or standalone section) ----
     // This section is shown directly in the calculus tab below the derivative stuff
+}
+
+// ============================================================
+// Advanced Mode Modal (floating window — backward compatible)
+// ============================================================
+void renderAdvancedModal() {
+    if (!g_state.showAdvanced) return;
+
+    ImGui::SetNextWindowSize(ImVec2(720, 600), ImGuiCond_FirstUseEver);
+    ImGui::Begin(T("Advanced Mode##adv", "高级模式##adv", "応用モード##adv"),
+                 &g_state.showAdvanced);
+
+    // Inline tab buttons (kept for backward compat with the old modal)
+    const char* tabNames[] = {
+        T("Calculus##t0", "微积分##t0", "微積分##t0"),
+        T("Fourier##t1", "傅里叶##t1", "フーリエ##t1"),
+        T("Complex##t2", "复变函数##t2", "複素関数##t2"),
+        T("Domain##t3", "域着色##t3", "領域彩色##t3"),
+        T("ProbStats##t4", "概率统计##t4", "確率統計##t4"),
+        T("3DSurface##t5", "3D曲面##t5", "3D曲面##t5"),
+        T("Ext##t6", "扩展##t6", "拡張##t6")
+    };
+    int tabCount = 7;
+
+    for (int i = 0; i < tabCount; i++) {
+        if (i > 0) ImGui::SameLine();
+        bool sel = (g_state.advTab == i);
+        if (sel) {
+            ImGui::PushStyleColor(ImGuiCol_Button, COL_BTN_FUNC);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, COL_BTN_FUNC_H);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, COL_BTN_FUNC_A);
+        }
+        if (ImGui::Button(tabNames[i])) {
+            g_state.advTab = i;
+        }
+        if (sel) ImGui::PopStyleColor(3);
+    }
+    ImGui::Separator();
+
+    // Render tab content using the shared function
+    renderAdvancedTabContent();
 
     ImGui::End();
 }
 
 // ============================================================
-// Bottom Function Graph — default sin(x)/cos(x) plot
+// Bottom Function Graph WITH user input field
 // ============================================================
-void renderBottomGraph() {
+void renderBottomGraphWithInput() {
     float availW = ImGui::GetContentRegionAvail().x;
     float availH = ImGui::GetContentRegionAvail().y;
 
-    // Reserve space for the graph
-    float graphH = availH;
-    if (graphH < 100.0f) graphH = 100.0f;
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+
+    // === Function Input Row ===
+    ImVec2 cp = ImGui::GetCursorScreenPos();
+
+    // Color marker (green square)
+    dl->AddRectFilled(ImVec2(cp.x, cp.y + 4), ImVec2(cp.x + 12, cp.y + 20),
+                      IM_COL32(80, 220, 120, 255), 2.0f);
+
+    // Expression input field
+    ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[3]);
+    ImGui::SetCursorScreenPos(ImVec2(cp.x + 18, cp.y));
+    ImGui::SetNextItemWidth(availW - 95);
+    bool enterPressed = ImGui::InputText("##funcInput", g_state.graphFunc,
+                                          sizeof(g_state.graphFunc),
+                                          ImGuiInputTextFlags_EnterReturnsTrue);
+
+    ImGui::SameLine(0, 4);
+    bool drawClicked = styledButton(T("Draw##fd", "绘制##fd", "描画##fd"),
+                                    COL_BTN_FUNC, COL_BTN_FUNC_H, COL_BTN_FUNC_A,
+                                    ImVec2(60, 24));
+    ImGui::PopFont();
+
+    bool needRedraw = enterPressed || drawClicked;
+
+    // === Generate Plot Data from User Expression ===
+    static bool plotGenerated = false;
+    static std::vector<PlotData> plots;
+    static std::string lastExpr;
+    static bool exprError = false;
+    static std::string exprErrorMsg;
+
+    bool exprChanged = (lastExpr != g_state.graphFunc);
+    if (!plotGenerated || needRedraw || exprChanged) {
+        lastExpr = g_state.graphFunc;
+        plotGenerated = true;
+        exprError = false;
+        plots.clear();
+
+        g_state.evaluator.setExpression(g_state.graphFunc);
+        if (g_state.evaluator.valid()) {
+            auto f = [&](double x) -> double {
+                g_state.evaluator.setExpression(g_state.graphFunc);
+                return g_state.evaluator.evaluate(x);
+            };
+            plots.push_back(PlotGenerator::generate(f, -10, 10, 500,
+                                                     g_state.graphFunc));
+        } else {
+            exprError = true;
+            exprErrorMsg = g_state.evaluator.lastError();
+        }
+    }
+
+    // === Graph Drawing ===
+    float graphH = availH - 32.0f;
+    if (graphH < 80.0f) graphH = 80.0f;
     if (graphH > 210.0f) graphH = 210.0f;
 
     ImVec2 graphPos = ImGui::GetCursorScreenPos();
     ImVec2 graphSize = ImVec2(availW, graphH);
 
-    ImDrawList* dl = ImGui::GetWindowDrawList();
-
-    // Generate sin(x) and cos(x) plot data once
-    static bool sinDataReady = false;
-    static std::vector<PlotData> sinPlots;
-    if (!sinDataReady) {
-        sinPlots.push_back(
-            PlotGenerator::generate([](double x) { return std::sin(x); },
-                                    -10, 10, 500, "sin(x)"));
-        sinPlots.push_back(
-            PlotGenerator::generate([](double x) { return std::cos(x); },
-                                    -10, 10, 500, "cos(x)"));
-        sinDataReady = true;
-    }
-
-    // Plot area with margins for labels
     float mg = 45.0f;
     ImVec2 plotOrigin(graphPos.x + mg, graphPos.y + 4.0f);
     ImVec2 plotSize(graphSize.x - mg - 4.0f, graphSize.y - mg - 4.0f);
@@ -1893,10 +2014,10 @@ void renderBottomGraph() {
     if (plotSize.x > 50 && plotSize.y > 50) {
         double xMin = -10, xMax = 10;
         double yMin = -1.5, yMax = 1.5;
-        // Auto-scale y axis from data
-        if (!sinPlots.empty()) {
-            yMin = std::min(sinPlots[0].y_min, sinPlots.size() > 1 ? sinPlots[1].y_min : -1.5);
-            yMax = std::max(sinPlots[0].y_max, sinPlots.size() > 1 ? sinPlots[1].y_max : 1.5);
+
+        if (!plots.empty() && !plots[0].points.empty()) {
+            yMin = plots[0].y_min;
+            yMax = plots[0].y_max;
         }
         double yPad = (yMax - yMin) * 0.1;
         if (yPad < 0.01) yPad = 0.1;
@@ -1905,29 +2026,38 @@ void renderBottomGraph() {
 
         drawGraphBg(dl, plotOrigin, plotSize);
         drawGrid(dl, plotOrigin, plotSize, xMin, xMax, yMin, yMax);
-        drawPlot(dl, plotOrigin, plotSize, xMin, xMax, yMin, yMax, sinPlots,
-                 {IM_COL32(80, 220, 120, 255), IM_COL32(255, 180, 80, 200)});
+        if (!plots.empty()) {
+            drawPlot(dl, plotOrigin, plotSize, xMin, xMax, yMin, yMax, plots,
+                     {IM_COL32(80, 220, 120, 255)});
+        }
         drawAxesLabels(dl, plotOrigin, plotSize, xMin, xMax, yMin, yMax);
     }
 
-    // Legend
+    // Error message overlay
+    if (exprError) {
+        ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[3]);
+        ImGui::SetCursorScreenPos(ImVec2(graphPos.x + 10, graphPos.y + 10));
+        ImGui::TextColored(ImVec4(1, 0.3f, 0.3f, 1), "%s", exprErrorMsg.c_str());
+        ImGui::PopFont();
+    }
+
+    // Legend (show expression being plotted, same color as line)
     float legX = graphPos.x + mg;
     float legY = graphPos.y + 6.0f;
-    dl->AddRectFilled(ImVec2(legX, legY), ImVec2(legX + 110, legY + 30),
+    dl->AddRectFilled(ImVec2(legX, legY), ImVec2(legX + 120, legY + 24),
                       IM_COL32(10, 10, 18, 200), 4.0f);
     dl->AddLine(ImVec2(legX + 4, legY + 10), ImVec2(legX + 24, legY + 10),
                 IM_COL32(80, 220, 120, 255), 2);
-    dl->AddText(ImVec2(legX + 28, legY + 3), IM_COL32(160, 220, 160, 255), "sin(x)");
-    dl->AddLine(ImVec2(legX + 4, legY + 22), ImVec2(legX + 24, legY + 22),
-                IM_COL32(255, 180, 80, 200), 2);
-    dl->AddText(ImVec2(legX + 28, legY + 15), IM_COL32(255, 200, 140, 255), "cos(x)");
+    char legLabel[280];
+    snprintf(legLabel, sizeof(legLabel), "y = %s", g_state.graphFunc);
+    dl->AddText(ImVec2(legX + 28, legY + 4), IM_COL32(160, 220, 160, 255), legLabel);
 
     // Advance cursor
     ImGui::SetCursorScreenPos(ImVec2(graphPos.x, graphPos.y + graphSize.y + 2));
 }
 
 // ============================================================
-// Main UI Render — adaptive to window size
+// Main UI Render — Xiaomi-style split layout + Advanced mode
 // ============================================================
 void renderUI() {
     // Initialize built-in extensions on first call
@@ -1952,18 +2082,40 @@ void renderUI() {
                  ImGuiWindowFlags_NoCollapse |
                  ImGuiWindowFlags_NoScrollbar);
 
-    // Top bar
+    // Top bar (full width)
     renderTopBar();
 
-    // LCD Display
-    renderLCD();
+    if (g_state.isAdvanced) {
+        // ========== ADVANCED MODE ==========
+        // Chrome-style tab bar at top
+        renderChromeTabBar();
 
-    // Button Grid
-    renderButtons();
+        // Tab content fills the remaining area
+        if (ImGui::BeginChild("##advContent", ImVec2(0, 0), false)) {
+            renderAdvancedTabContent();
+        }
+        ImGui::EndChild();
+    } else {
+        // ========== STANDARD MODE (Xiaomi style) ==========
+        // LCD Display
+        renderLCD();
 
-    // Bottom function graph (sin(x)/cos(x))
-    ImGui::Separator();
-    renderBottomGraph();
+        // Split: calculator buttons (55% left) + function graph (45% right)
+        float leftW = winW * 0.55f;
+        if (leftW < 260.0f) leftW = 260.0f;
+
+        // Left column: button grid
+        ImGui::BeginChild("##calcLeft", ImVec2(leftW, 0), false);
+        renderButtons();
+        ImGui::EndChild();
+
+        ImGui::SameLine(0, 4);
+
+        // Right column: function input + graph
+        ImGui::BeginChild("##calcRight", ImVec2(0, 0), false);
+        renderBottomGraphWithInput();
+        ImGui::EndChild();
+    }
 
     // Help popup (opened from Row 6 Help button)
     if (ImGui::BeginPopup("##helpPopup")) {
@@ -1992,7 +2144,7 @@ void renderUI() {
 
     ImGui::End(); // Main window
 
-    // Panels
+    // Panels (floating)
     renderHistoryPanel();
     renderConstantsPanel();
     renderAdvancedModal();

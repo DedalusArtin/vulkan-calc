@@ -24,8 +24,14 @@ void renderUI();
 // Render top bar
 void renderTopBar();
 
-// Render bottom function graph (sin/cos)
-void renderBottomGraph();
+// Render bottom function graph with input field
+void renderBottomGraphWithInput();
+
+// Render Chrome-style tab bar for advanced mode
+void renderChromeTabBar();
+
+// Render content of the selected advanced tab (inline, no modal)
+void renderAdvancedTabContent();
 
 // ============================================================
 // NEW: Individual tab renderers
