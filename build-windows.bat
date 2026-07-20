@@ -1,7 +1,6 @@
 @echo off
-REM Windows Build Script for VulkanCalc 2.0 (Casio Calculator)
-REM Run from a Developer Command Prompt for VS 2022
-REM Requires: VS 2022, Vulkan SDK, CMake 3.22+, vcpkg (for glfw3/glm)
+REM VulkanCalc Windows Build Script
+REM 从 VS2022 开发者命令提示符运行
 
 setlocal enabledelayedexpansion
 
@@ -14,81 +13,64 @@ echo Building VulkanCalc for Windows
 echo Casio fx-991CNX Style Calculator
 echo ========================================
 
-REM Check Vulkan SDK
+REM ---- Vulkan SDK ----
 if "%VULKAN_SDK%"=="" (
     if exist "E:\Programming\vulkan\1.4.350.0" (
         set VULKAN_SDK=E:\Programming\vulkan\1.4.350.0
-    ) else if exist "C:\VulkanSDK" (
-        set VULKAN_SDK=C:\VulkanSDK
     ) else if exist "C:\VulkanSDK\1.4.350.0" (
         set VULKAN_SDK=C:\VulkanSDK\1.4.350.0
+    ) else if exist "C:\VulkanSDK" (
+        set VULKAN_SDK=C:\VulkanSDK
     ) else (
         echo [ERROR] Vulkan SDK not found.
-        echo   Download from: https://vulkan.lunarg.com/sdk/home
-        pause
-        exit /b 1
+        echo   Download: https://vulkan.lunarg.com/sdk/home
+        pause & exit /b 1
     )
 )
 echo [OK] Vulkan SDK: %VULKAN_SDK%
 
-REM Check vcpkg
+REM ---- vcpkg ----
 if "%VCPKG_ROOT%"=="" (
-    if exist "C:\vcpkg" (
-        set VCPKG_ROOT=C:\vcpkg
-    ) else if exist "E:\Programming\vcpkg" (
+    if exist "E:\Programming\vcpkg" (
         set VCPKG_ROOT=E:\Programming\vcpkg
-    ) else if exist "%LOCALAPPDATA%\vcpkg" (
-        set VCPKG_ROOT=%LOCALAPPDATA%\vcpkg
+    ) else if exist "C:\vcpkg" (
+        set VCPKG_ROOT=C:\vcpkg
     ) else (
-        echo [WARN] vcpkg not found. Installing glfw3 and glm may fail.
+        echo [WARN] vcpkg not found (glfw3/glm may fail)
     )
 )
-if not "%VCPKG_ROOT%"=="" (
-    echo [OK] vcpkg: %VCPKG_ROOT%
-)
+if not "%VCPKG_ROOT%"=="" echo [OK] vcpkg: %VCPKG_ROOT%
 
-REM Create build dir
+REM ---- Build dir ----
 if not exist "%BUILD_DIR%" mkdir "%BUILD_DIR%"
 cd /d "%BUILD_DIR%"
 
-REM Configure with CMake
-echo [..] Configuring with CMake...
-set CMAKE_ARGS=-G "Visual Studio 17 2022" -A x64 ^
-    -DCMAKE_PREFIX_PATH="%VULKAN_SDK%" ^
-    -DVULKAN_SDK="%VULKAN_SDK%"
-
+REM ---- CMake Configure ----
+echo [..] Configuring...
 if not "%VCPKG_ROOT%"=="" (
-    set CMAKE_ARGS=%CMAKE_ARGS% -DCMAKE_TOOLCHAIN_FILE="%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake"
+    cmake "%PROJECT_DIR%" -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="%VULKAN_SDK%" -DVULKAN_SDK="%VULKAN_SDK%" -DCMAKE_TOOLCHAIN_FILE="%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake"
+) else (
+    cmake "%PROJECT_DIR%" -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="%VULKAN_SDK%" -DVULKAN_SDK="%VULKAN_SDK%"
 )
-
-cmake "%PROJECT_DIR%" %CMAKE_ARGS%
-
 if %ERRORLEVEL% neq 0 (
-    echo [ERROR] CMake configuration failed. See above.
-    pause
-    exit /b 1
+    echo [ERROR] CMake configuration failed
+    pause & exit /b 1
 )
 
-REM Build
+REM ---- Build ----
 echo [..] Building...
 cmake --build . --config Release --parallel
-
 if %ERRORLEVEL% neq 0 (
-    echo [ERROR] Build failed. See above.
-    pause
-    exit /b 1
+    echo [ERROR] Build failed
+    pause & exit /b 1
 )
 
-REM Copy to output
+REM ---- Copy output ----
 echo [..] Copying to %OUTPUT_DIR%
 if not exist "%OUTPUT_DIR%" mkdir "%OUTPUT_DIR%"
 copy /Y "%BUILD_DIR%\Release\vulkan_calc.exe" "%OUTPUT_DIR%\"
 copy /Y "%PROJECT_DIR%\icon\app.ico" "%OUTPUT_DIR%\"
-
-REM Copy required DLLs (from Vulkan SDK)
-if exist "%VULKAN_SDK%\Bin\vulkan-1.dll" (
-    copy /Y "%VULKAN_SDK%\Bin\vulkan-1.dll" "%OUTPUT_DIR%\"
-)
+if exist "%VULKAN_SDK%\Bin\vulkan-1.dll" copy /Y "%VULKAN_SDK%\Bin\vulkan-1.dll" "%OUTPUT_DIR%\"
 
 echo ========================================
 echo [DONE] Build complete!
