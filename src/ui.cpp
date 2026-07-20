@@ -1210,7 +1210,7 @@ void renderAdvancedTabContent() {
                 
                 // Explicit "Enlarge" button below the plot
                 ImGui::SetCursorScreenPos(ImVec2(po.x, po.y + ps.y + 4));
-                if (ImGui::Button(T("🔍 Enlarge##expBtn", "🔍 放大##expBtn", "🔍 拡大##expBtn"), ImVec2(80, 24))) {
+                if (ImGui::Button(T("[+] 放大##expBtn", "[+] 放大##expBtn", "[+] 拡大##expBtn"), ImVec2(80, 24))) {
                     g_state.showLargePlot = true;
                     g_state.largePlotXMin = xMin; g_state.largePlotXMax = xMax;
                     g_state.largePlotYMin = yMin; g_state.largePlotYMax = yMax;
@@ -1570,7 +1570,7 @@ void renderAdvancedTabContent() {
                 }
                 // Explicit enlarge button
                 ImGui::SetCursorScreenPos(ImVec2(po.x, po.y + ps.y + 4));
-                if (ImGui::Button(T("🔍 Enlarge##fourierExp", "🔍 放大##fourierExp", "🔍 拡大##fourierExp"), ImVec2(80, 24))) {
+                if (ImGui::Button(T("[+] 放大##fourierExp", "[+] 放大##fourierExp", "[+] 拡大##fourierExp"), ImVec2(80, 24))) {
                     g_state.showLargePlot = true;
                     g_state.largePlotXMin = xM; g_state.largePlotXMax = xX;
                     g_state.largePlotYMin = yM; g_state.largePlotYMax = yX;
@@ -2043,7 +2043,7 @@ void renderAdvancedTabContent() {
         
         // Enlarge button for 3D view
         ImGui::SameLine();
-        if (ImGui::Button(T("🔍 FullScreen##3dzoom", "🔍 全屏##3dzoom", "🔍 全画面##3dzoom"), ImVec2(80, 28))) {
+        if (ImGui::Button(T("[+] 全屏##3dzoom", "[+] 全屏##3dzoom", "[+] 全画面##3dzoom"), ImVec2(80, 28))) {
             g_state.showLarge3D = true;
         }
     }
@@ -2549,8 +2549,7 @@ void renderLargePlotView() {
     ImGui::Begin("##largePlot", nullptr,
                  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                  ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
-                 ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDecoration |
-                 ImGuiWindowFlags_NoBringToFrontOnFocus);
+                 ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDecoration);
 
     auto* dl = ImGui::GetWindowDrawList();
 
@@ -2616,29 +2615,19 @@ void renderLargePlotView() {
         }
     }
 
-    // Drag to pan (manual tracking)
-    if (ImGui::IsMouseDown(ImGuiMouseButton_Left) && hovered) {
-        if (!g_state.largePlotDragging) {
-            g_state.largePlotDragging = true;
-            g_state.largePlotLastX = io.MousePos.x;
-            g_state.largePlotLastY = io.MousePos.y;
-        } else {
-            double dx = (g_state.largePlotLastX - io.MousePos.x) /
-                        plotSize.x * (g_state.largePlotXMax - g_state.largePlotXMin);
-            double dy = (io.MousePos.y - g_state.largePlotLastY) /
-                        plotSize.y * (g_state.largePlotYMax - g_state.largePlotYMin);
+    // Drag to pan using ImGui's built-in drag detection
+    // This avoids issues with stale mouse-down from the enlarge button click
+    if (hovered && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 5.0f)) {
+        ImVec2 dragDelta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left, 5.0f);
+        double dx = -dragDelta.x / plotSize.x * (g_state.largePlotXMax - g_state.largePlotXMin);
+        double dy =  dragDelta.y / plotSize.y * (g_state.largePlotYMax - g_state.largePlotYMin);
 
-            g_state.largePlotXMin += dx;
-            g_state.largePlotXMax += dx;
-            g_state.largePlotYMin += dy;
-            g_state.largePlotYMax += dy;
-
-            g_state.largePlotLastX = io.MousePos.x;
-            g_state.largePlotLastY = io.MousePos.y;
-            g_state.largePlotDirty = true;
-        }
-    } else {
-        g_state.largePlotDragging = false;
+        g_state.largePlotXMin += dx;
+        g_state.largePlotXMax += dx;
+        g_state.largePlotYMin += dy;
+        g_state.largePlotYMax += dy;
+        g_state.largePlotDirty = true;
+        ImGui::ResetMouseDragDelta(ImGuiMouseButton_Left);
     }
 
     // Draw graph
