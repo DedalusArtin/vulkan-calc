@@ -71,3 +71,6 @@ void draw3DSurface(ImDrawList* dl, ImVec2 o, ImVec2 sz,
 
 // Boot screen animation
 void renderBootScreen();
+
+// Large plot viewer (full-screen expandable plot)
+void renderLargePlotView();

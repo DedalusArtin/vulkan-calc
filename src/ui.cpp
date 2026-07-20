@@ -982,7 +982,7 @@ void renderAdvancedTabContent() {
                 double v = g_state.evaluator.evaluate(g_state.evalX);
                 std::ostringstream oss;
                 oss << v;
-                g_state.result = oss.str();
+                g_state.advResult = oss.str();
                 g_state.error.clear();
             } else {
                 g_state.error = g_state.evaluator.lastError();
@@ -999,9 +999,9 @@ void renderAdvancedTabContent() {
                 },
                 g_state.intA, g_state.intB);
             std::ostringstream o;
-            o << "∫[" << r.value << "]";
-            g_state.intResult = o.str();
-            g_state.result = std::to_string(r.value);
+            o << "∫ = " << r.value;
+            g_state.advIntegralResult = o.str();
+            g_state.advResult = std::to_string(r.value);
             g_state.plotMode = CalcState::PLOT_INTEG;
             g_state.plots = PlotGenerator::generateMultiple(
                 {[&](double x) {
@@ -1037,19 +1037,28 @@ void renderAdvancedTabContent() {
             g_state.plots.push_back(
                 PlotGenerator::generate(deriv, g_state.plotXMin, g_state.plotXMax,
                                         500, "f'(x)"));
+            // Compute derivative at current evalX
+            double derivVal = deriv(g_state.evalX);
+            std::ostringstream do2;
+            do2 << "f'(" << g_state.evalX << ") = " << derivVal;
+            g_state.advDerivResult = do2.str();
         }
 
         // Result text
-        if (!g_state.result.empty()) {
+        if (!g_state.advResult.empty()) {
             ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.3f, 1),
-                               "f(%.4f) = %s", g_state.evalX, g_state.result.c_str());
+                               "f(%.4f) = %s", g_state.evalX, g_state.advResult.c_str());
         }
         if (!g_state.error.empty()) {
             ImGui::TextColored(ImVec4(1, 0.3f, 0.3f, 1), "%s", g_state.error.c_str());
         }
-        if (!g_state.intResult.empty()) {
+        if (!g_state.advIntegralResult.empty()) {
             ImGui::TextColored(ImVec4(0.6f, 0.4f, 0.1f, 1), "%s",
-                               g_state.intResult.c_str());
+                               g_state.advIntegralResult.c_str());
+        }
+        if (!g_state.advDerivResult.empty()) {
+            ImGui::TextColored(ImVec4(0.8f, 0.3f, 0.6f, 1), "%s",
+                               g_state.advDerivResult.c_str());
         }
 
         // Plot
@@ -1081,6 +1090,21 @@ void renderAdvancedTabContent() {
                 drawPlot(dl, po, ps, xMin, xMax, yMin, yMax, g_state.plots,
                          {IM_COL32(80, 200, 255, 255), IM_COL32(255, 180, 80, 255)});
                 drawAxesLabels(dl, po, ps, xMin, xMax, yMin, yMax);
+
+                // Click on plot to expand to large viewer
+                ImGui::SetCursorScreenPos(po);
+                ImGui::InvisibleButton("##expandPlot", ps);
+                if (ImGui::IsItemClicked()) {
+                    g_state.showLargePlot = true;
+                    g_state.largePlotXMin = xMin; g_state.largePlotXMax = xMax;
+                    g_state.largePlotYMin = yMin; g_state.largePlotYMax = yMax;
+                    g_state.largePlotDirty = true;
+                }
+                // Show hint on hover
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("%s",
+                        T("Click to expand plot", "点击放大图像", "クリックして拡大"));
+                }
             }
         }
         ImGui::EndChild();
@@ -1439,7 +1463,7 @@ void renderAdvancedTabContent() {
             };
             auto cr = ComplexAnalysis::cauchyIntegral(f, a, g_state.cauchyRadius);
             g_state.complexResult = "Cauchy ∮ = " + to_string(cr, 4);
-            g_state.result = to_string(cr, 4);
+            g_state.advResult = to_string(cr, 4);
         }
         ImGui::SameLine();
         if (ImGui::Button(T("Residue##cb", "留数##cb", "留数##cb"))) {
@@ -1454,8 +1478,8 @@ void renderAdvancedTabContent() {
         }
         ImGui::SameLine();
         if (ImGui::Button("Γ(z)##cb")) {
-            g_state.result = "Γ(0.5) = " +
-                             std::to_string(SpecialFunctions::gamma(0.5));
+            g_state.advResult = "Γ(0.5) = " +
+                                std::to_string(SpecialFunctions::gamma(0.5));
         }
 
         ImGui::SetNextItemWidth(60);
@@ -2093,6 +2117,161 @@ void renderBottomGraphWithInput() {
 }
 
 // ============================================================
+// Large Plot Viewer — full-screen expandable plot
+// ============================================================
+void renderLargePlotView() {
+    auto& io = ImGui::GetIO();
+    ImVec2 winPos(0, 0);
+    ImVec2 winSize = io.DisplaySize;
+
+    ImGui::SetNextWindowPos(winPos);
+    ImGui::SetNextWindowSize(winSize);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
+    ImGui::Begin("##largePlot", nullptr,
+                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
+                 ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDecoration |
+                 ImGuiWindowFlags_NoBringToFrontOnFocus);
+
+    auto* dl = ImGui::GetWindowDrawList();
+
+    // Background
+    dl->AddRectFilled(winPos, ImVec2(winPos.x + winSize.x, winPos.y + winSize.y),
+                      IM_COL32(5, 5, 10, 240));
+
+    // Close button (X) top-right
+    float btnS = 36.0f;
+    ImVec2 closePos(winPos.x + winSize.x - btnS - 16, winPos.y + 12);
+    ImGui::SetCursorScreenPos(closePos);
+    ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(40, 40, 60, 200));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(80, 40, 40, 230));
+    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(200, 200, 220, 255));
+    if (ImGui::Button("✕##lpClose", ImVec2(btnS, btnS))) {
+        g_state.showLargePlot = false;
+    }
+    ImGui::PopStyleColor(3);
+
+    // ESC to close
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        g_state.showLargePlot = false;
+    }
+
+    // Function expression display
+    std::string exprLabel = "f(x) = " + g_state.advExpr;
+    ImGui::SetCursorScreenPos(ImVec2(winPos.x + 20, winPos.y + 16));
+    ImGui::TextColored(ImVec4(0.2f, 0.9f, 0.4f, 1), "%s", exprLabel.c_str());
+
+    // Plot area
+    float margin = 80.0f;
+    ImVec2 plotOrigin(winPos.x + margin, winPos.y + margin + 10);
+    ImVec2 plotSize(winSize.x - 2.0f * margin, winSize.y - 2.0f * margin - 10);
+    if (plotSize.x < 50) plotSize.x = 50;
+    if (plotSize.y < 50) plotSize.y = 50;
+
+    // Invisible button for mouse interaction
+    ImGui::SetCursorScreenPos(plotOrigin);
+    ImGui::InvisibleButton("##lpArea", plotSize);
+    bool hovered = ImGui::IsItemHovered();
+
+    // Handle scroll zoom (centered on mouse)
+    if (hovered) {
+        float wheel = io.MouseWheel;
+        if (wheel != 0.0f) {
+            ImVec2 mouse = io.MousePos;
+            double mx = (mouse.x - plotOrigin.x) / plotSize.x; // 0-1 normalized
+            double my = (mouse.y - plotOrigin.y) / plotSize.y;
+
+            // World-coordinate center of zoom
+            double cx = g_state.largePlotXMin + mx * (g_state.largePlotXMax - g_state.largePlotXMin);
+            double cy = g_state.largePlotYMax - my * (g_state.largePlotYMax - g_state.largePlotYMin);
+
+            double factor = (wheel > 0) ? 0.85 : 1.18;  // zoom in/out
+            double halfW = (g_state.largePlotXMax - g_state.largePlotXMin) * factor * 0.5;
+            double halfH = (g_state.largePlotYMax - g_state.largePlotYMin) * factor * 0.5;
+
+            g_state.largePlotXMin = cx - halfW;
+            g_state.largePlotXMax = cx + halfW;
+            g_state.largePlotYMin = cy - halfH;
+            g_state.largePlotYMax = cy + halfH;
+            g_state.largePlotDirty = true;
+        }
+    }
+
+    // Drag to pan (manual tracking)
+    if (ImGui::IsMouseDown(ImGuiMouseButton_Left) && hovered) {
+        if (!g_state.largePlotDragging) {
+            g_state.largePlotDragging = true;
+            g_state.largePlotLastX = io.MousePos.x;
+            g_state.largePlotLastY = io.MousePos.y;
+        } else {
+            double dx = (g_state.largePlotLastX - io.MousePos.x) /
+                        plotSize.x * (g_state.largePlotXMax - g_state.largePlotXMin);
+            double dy = (io.MousePos.y - g_state.largePlotLastY) /
+                        plotSize.y * (g_state.largePlotYMax - g_state.largePlotYMin);
+
+            g_state.largePlotXMin += dx;
+            g_state.largePlotXMax += dx;
+            g_state.largePlotYMin += dy;
+            g_state.largePlotYMax += dy;
+
+            g_state.largePlotLastX = io.MousePos.x;
+            g_state.largePlotLastY = io.MousePos.y;
+            g_state.largePlotDirty = true;
+        }
+    } else {
+        g_state.largePlotDragging = false;
+    }
+
+    // Draw graph
+    if (plotSize.x > 0 && plotSize.y > 0) {
+        drawGraphBg(dl, plotOrigin, plotSize);
+        drawGrid(dl, plotOrigin, plotSize,
+                 g_state.largePlotXMin, g_state.largePlotXMax,
+                 g_state.largePlotYMin, g_state.largePlotYMax);
+
+        // Generate plot points
+        g_state.evaluator.setExpression(g_state.advExpr);
+        auto f = [&](double x) -> double {
+            g_state.evaluator.setExpression(g_state.advExpr);
+            return g_state.evaluator.evaluate(x);
+        };
+
+        std::vector<PlotData> largePlots;
+        largePlots.push_back(
+            PlotGenerator::generate(f, g_state.largePlotXMin, g_state.largePlotXMax, 800));
+
+        drawPlot(dl, plotOrigin, plotSize,
+                 g_state.largePlotXMin, g_state.largePlotXMax,
+                 g_state.largePlotYMin, g_state.largePlotYMax,
+                 largePlots, {IM_COL32(80, 200, 255, 255)});
+        drawAxesLabels(dl, plotOrigin, plotSize,
+                       g_state.largePlotXMin, g_state.largePlotXMax,
+                       g_state.largePlotYMin, g_state.largePlotYMax);
+    }
+
+    // Hint text
+    std::string hint = T("Drag to pan · Scroll to zoom · ESC to close",
+                         "拖拽平移 · 滚轮缩放 · ESC 关闭",
+                         "ドラッグで移動 · スクロールで拡大縮小 · ESCで閉じる");
+    ImVec2 hintSz = ImGui::CalcTextSize(hint.c_str());
+    ImGui::SetCursorScreenPos(ImVec2(winPos.x + winSize.x - hintSz.x - 20,
+                                      winPos.y + winSize.y - hintSz.y - 16));
+    ImGui::TextColored(ImVec4(0.4f, 0.4f, 0.6f, 0.7f), "%s", hint.c_str());
+
+    // Re-center button
+    ImGui::SetCursorScreenPos(ImVec2(winPos.x + 20, winPos.y + winSize.y - 36));
+    if (ImGui::Button(T("Reset View##lpReset", "重置视图##lpReset", "ビューリセット##lpReset"),
+                       ImVec2(100, 26))) {
+        g_state.largePlotXMin = -10; g_state.largePlotXMax = 10;
+        g_state.largePlotYMin = -10; g_state.largePlotYMax = 10;
+        g_state.largePlotDirty = true;
+    }
+
+    ImGui::End();
+    ImGui::PopStyleVar();
+}
+
+// ============================================================
 // Main UI Render — Xiaomi-style split layout + Advanced mode
 // ============================================================
 void renderUI() {
@@ -2184,6 +2363,11 @@ void renderUI() {
     renderHistoryPanel();
     renderConstantsPanel();
     renderAdvancedModal();
+
+    // Large plot viewer (overlay)
+    if (g_state.showLargePlot) {
+        renderLargePlotView();
+    }
 }
 
 // ============================================================

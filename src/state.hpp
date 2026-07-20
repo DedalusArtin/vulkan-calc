@@ -92,6 +92,16 @@ struct CalcState {
     // Advanced tab expression (independent from main calculator display)
     // ============================================================
     std::string advExpr = "sin(x)";
+    std::string advResult = "";        // Advanced tab evaluation result
+    std::string advIntegralResult = ""; // Advanced tab integral result
+    std::string advDerivResult = "";    // Advanced tab derivative result
+    // Large plot view
+    bool showLargePlot = false;
+    double largePlotXMin = -10, largePlotXMax = 10;
+    double largePlotYMin = -10, largePlotYMax = 10;
+    bool largePlotDragging = false;
+    double largePlotLastX = 0, largePlotLastY = 0;
+    bool largePlotDirty = true;
 
     // ============================================================
     // Legacy state for Fourier / Complex / Domain coloring
