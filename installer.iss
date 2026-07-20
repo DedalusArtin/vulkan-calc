@@ -44,11 +44,16 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Files]
 ; 主程序
 Source: "F:\vulkan-calc\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-; 图标文件
+; 字体文件
+Source: "F:\vulkan-calc\fonts\NotoSansCJK-Regular.ttc"; DestDir: "{app}\fonts"; Flags: ignoreversion
+; 图标
 Source: "icon\{#MyAppIcoName}"; DestDir: "{app}"; Flags: ignoreversion
-; Vulkan 运行时 DLL（如存在）
-Source: "F:\vulkan-calc\vulkan-1.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
-; 其他运行时库（如存在）
+; DLL运行时库（从vcpkg安装目录复制）
+Source: "E:\Programming\vcpkg\installed\x64-windows\bin\glfw3.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "E:\Programming\vcpkg\installed\x64-windows\bin\glm.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+; Vulkan DLL
+Source: "E:\Programming\vulkan\1.4.350.0\Bin\vulkan-1.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+; 其他运行时库
 Source: "F:\vulkan-calc\*.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
 [Dirs]

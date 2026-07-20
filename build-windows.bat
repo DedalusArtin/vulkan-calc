@@ -53,5 +53,7 @@ echo [..] Copying...
 if not exist "%OUTPUT_DIR%" mkdir "%OUTPUT_DIR%"
 copy /Y "%BUILD_DIR%\Release\vulkan_calc.exe" "%OUTPUT_DIR%\"
 if exist "%VULKAN_SDK%\Bin\vulkan-1.dll" copy /Y "%VULKAN_SDK%\Bin\vulkan-1.dll" "%OUTPUT_DIR%\"
+REM Copy glfw3 runtime DLL
+if exist "%VCPKG_ROOT%\installed\x64-windows\bin\glfw3.dll" copy /Y "%VCPKG_ROOT%\installed\x64-windows\bin\glfw3.dll" "%OUTPUT_DIR%\"
 echo [DONE] %OUTPUT_DIR%\vulkan_calc.exe
 pause
