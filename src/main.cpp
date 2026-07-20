@@ -115,7 +115,7 @@ int main() {
     setCol(ImGuiCol_TitleBgActive, 0.06f, 0.06f, 0.12f, 0.95f);
 
     // --- Init ImGui backends ---
-    ImGui_ImplGlfw_InitForVulkan(w, true);
+    ImGui_ImplGlfw_InitForVulkan(w, false); // manual callback forwarding
     ImGui_ImplVulkan_InitInfo vi{};
     vi.Instance = renderer.m_instance;
     vi.PhysicalDevice = renderer.m_physicalDevice;
@@ -132,10 +132,17 @@ int main() {
     ImGui_ImplVulkan_Init(&vi);
     ImGui_ImplVulkan_CreateFontsTexture();
 
-    // Keyboard callback
+    // Keyboard callback — forward to BOTH ImGui and our logic
     glfwSetKeyCallback(w, [](GLFWwindow* window, int key, int scancode,
                               int action, int mods) {
+        // Always forward to ImGui first (so InputText works)
+        ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
+        // Also forward character input (for text entry in LCD InputText)
         if (action == GLFW_PRESS || action == GLFW_REPEAT) {
+            // Let ImGui handle it if it wants capture
+            ImGuiIO& io = ImGui::GetIO();
+            if (io.WantCaptureKeyboard) return;
+
             // Ignore modifier-only keys
             if (key == GLFW_KEY_LEFT_SHIFT || key == GLFW_KEY_RIGHT_SHIFT ||
                 key == GLFW_KEY_LEFT_CONTROL || key == GLFW_KEY_RIGHT_CONTROL ||
@@ -143,6 +150,10 @@ int main() {
                 key == GLFW_KEY_CAPS_LOCK) return;
             calcKeyboardInput(key, mods);
         }
+    });
+    // Also set char callback for Unicode text input
+    glfwSetCharCallback(w, [](GLFWwindow* win, unsigned int codepoint) {
+        ImGui_ImplGlfw_CharCallback(win, codepoint);
     });
 
     // ============================================================

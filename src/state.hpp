@@ -68,6 +68,9 @@ struct CalcState {
     // Manual input buffer (for InputText LCD)
     char inputBuf[1024] = "";
 
+    // Cursor position in input buffer (for arrow key navigation)
+    int inputCursorPos = 0;
+
     // Font size: 0=small, 1=medium, 2=large
     int fontSize = 1;
 

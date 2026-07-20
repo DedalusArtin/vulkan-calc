@@ -112,7 +112,7 @@ void renderLCD() {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     ImVec2 pos = ImGui::GetCursorScreenPos();
     float w = ImGui::GetContentRegionAvail().x;
-    float h = 165.0f;
+    float h = 185.0f;
 
     // Determine flash border color
     ImU32 borderCol = COL_LCD_BG;
@@ -143,19 +143,45 @@ void renderLCD() {
         // Not focused - keep inputBuf in sync with display
         strncpy(g_state.inputBuf, g_state.display.c_str(), sizeof(g_state.inputBuf) - 1);
         g_state.inputBuf[sizeof(g_state.inputBuf) - 1] = '\0';
+        // Reset cursor position when not focused
+        g_state.inputCursorPos = (int)g_state.display.size();
     }
 
-    ImGui::SetCursorScreenPos(ImVec2(pos.x + padX, y));
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(10, 18, 10, 0)); // transparent
-    ImGui::PushStyleColor(ImGuiCol_Text, COL_LCD_TEXT);
-    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(10, 18, 10, 0));
-    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, IM_COL32(10, 18, 10, 10));
-
-    // Calculate font-based height for input field
+    // Calculate font-based height for input field - enforce minimum 40px
     pushLcdFont();
-    float lcdFontH = ImGui::GetFontSize() + 6.0f;
+    float lcdFontH = std::max(ImGui::GetFontSize() + 6.0f, 40.0f);
+
+    // Make the entire LCD width clickable to focus the input
+    static bool focusInputNextFrame = false;
+    ImGui::SetCursorScreenPos(ImVec2(pos.x, y));
+    ImGui::InvisibleButton("##lcdClickArea", ImVec2(w, lcdFontH));
+    if (ImGui::IsItemClicked()) {
+        focusInputNextFrame = true;
+        g_state.inputCursorPos = (int)std::strlen(g_state.inputBuf);
+    }
+    // Highlight the clickable area on hover
+    if (ImGui::IsItemHovered()) {
+        dl->AddRectFilled(ImVec2(pos.x + 4, y), ImVec2(pos.x + w - 4, y + lcdFontH),
+                          IM_COL32(20, 35, 20, 100), 4.0f);
+    }
+
+    // Draw a subtle input background to show the editable area
+    dl->AddRectFilled(ImVec2(pos.x + 4, y), ImVec2(pos.x + w - 4, y + lcdFontH),
+                      IM_COL32(15, 25, 15, 200), 4.0f);
+
+    ImGui::SetCursorScreenPos(ImVec2(pos.x + padX, y + 2));
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(15, 25, 15, 0)); // transparent
+    ImGui::PushStyleColor(ImGuiCol_Text, COL_LCD_TEXT);
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(15, 25, 15, 0));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, IM_COL32(15, 25, 15, 10));
 
     ImGui::SetNextItemWidth(w - padX * 2);
+
+    // Set keyboard focus if LCD area was clicked
+    if (focusInputNextFrame) {
+        ImGui::SetKeyboardFocusHere();
+        focusInputNextFrame = false;
+    }
     if (ImGui::InputText("##lcdInput", g_state.inputBuf, sizeof(g_state.inputBuf),
                          ImGuiInputTextFlags_EnterReturnsTrue)) {
         // Enter pressed in input field -> evaluate
@@ -169,6 +195,8 @@ void renderLCD() {
         // User is editing - sync display to inputBuf
         g_state.display = g_state.inputBuf;
         g_state.hasResult = false;
+        // Cursor at end when editing in InputText (ImGui manages internal cursor)
+        g_state.inputCursorPos = (int)g_state.display.size();
     }
     lcdWasFocused = lcdIsFocused;
 
@@ -310,23 +338,23 @@ void renderLCD() {
 void renderButtons() {
     float availW = ImGui::GetContentRegionAvail().x;
     float btnW = (availW - (BTN_COLS - 1) * BTN_GAP) / (float)BTN_COLS;
-    float btnH = 44.0f;
+    float btnH = 46.0f;
 
     auto sameLine = [&]() { ImGui::SameLine(0, BTN_GAP); };
     auto btnSize = ImVec2(btnW, btnH);
 
-    // Row 0: Blue function keys — USE UNIQUE IDs
+    // Row 0: Blue function keys — USE UNIQUE IDs — parentheses with func keys
     if (funcBtn("sin##r0c0")) calcOnButton("sin"); sameLine();
     if (funcBtn("cos##r0c1")) calcOnButton("cos"); sameLine();
     if (funcBtn("tan##r0c2")) calcOnButton("tan"); sameLine();
-    if (funcBtn("log##r0c3")) calcOnButton("log"); sameLine();
-    if (funcBtn("ln##r0c4"))  calcOnButton("ln");
+    if (funcBtn("(##r0c3"))   calcOnButton("(");  sameLine();
+    if (funcBtn(")##r0c4"))   calcOnButton(")");
 
     // Row 1: Blue function keys
     if (funcBtn("x²##r1c0"))  calcOnButton("x²"); sameLine();
-    if (funcBtn("√##r1c1"))   calcOnButton("√"); sameLine();
+    if (funcBtn("√##r1c1"))   calcOnButton("√");  sameLine();
     if (funcBtn("x^y##r1c2")) calcOnButton("x^y"); sameLine();
-    if (funcBtn("π##r1c3"))   calcOnButton("π"); sameLine();
+    if (funcBtn("π##r1c3"))   calcOnButton("π");  sameLine();
     if (funcBtn("e##r1c4"))   calcOnButton("e");
 
     // Row 2: 7 8 9 ÷ DEL
@@ -343,26 +371,29 @@ void renderButtons() {
     if (opBtn("×##r3c3"))   calcOnButton("×"); sameLine();
     if (acBtn("AC##r3c4"))  calcOnButton("AC");
 
-    // Row 4: 1 2 3 ( ) -
+    // Row 4: 1 2 3 + -
     if (numBtn("1##r4c0"))  calcOnButton("1"); sameLine();
     if (numBtn("2##r4c1"))  calcOnButton("2"); sameLine();
     if (numBtn("3##r4c2"))  calcOnButton("3"); sameLine();
-    if (styledButton("(##r4c3", COL_BTN_NUM, COL_BTN_NUM_H, COL_BTN_NUM_A, btnSize))
-        calcOnButton("(");
-    if (styledButton(")##r4c4", COL_BTN_NUM, COL_BTN_NUM_H, COL_BTN_NUM_A, btnSize))
-        calcOnButton(")");
+    if (opBtn("+##r4c3"))   calcOnButton("+"); sameLine();
+    if (opBtn("-##r4c4"))   calcOnButton("-");
 
-    // Row 5: 0 . Ans + =
+    // Row 5: 0 . Ans log ln
     if (numBtn("0##r5c0"))  calcOnButton("0"); sameLine();
     if (numBtn(".##r5c1"))  calcOnButton("."); sameLine();
     if (toolBtn("Ans##r5c2")) calcOnButton("Ans"); sameLine();
-    if (opBtn("+##r5c3"))   calcOnButton("+"); sameLine();
-    if (opBtn("-##r5c4"))   calcOnButton("-");
+    if (funcBtn("log##r5c3")) calcOnButton("log"); sameLine();
+    if (funcBtn("ln##r5c4"))  calcOnButton("ln");
 
-    // Row 6: = button spans full width
+    // Row 6: = button spans full width, taller
     {
         float eqBtnW = availW; // full width
-        if (eqBtn("=##r6c0"))
+        float eqBtnH = 54.0f;  // taller = button
+        ImGui::SetCursorScreenPos(ImVec2(
+            ImGui::GetCursorScreenPos().x,
+            ImGui::GetCursorScreenPos().y));
+        if (styledButton("=##r6c0", COL_BTN_EQ, COL_BTN_EQ_H, COL_BTN_EQ_A,
+                         ImVec2(eqBtnW, eqBtnH)))
             calcOnButton("=");
     }
 }

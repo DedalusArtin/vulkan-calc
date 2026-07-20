@@ -220,16 +220,30 @@ void calcClear() {
     g_state.error.clear();
     g_state.hasResult = false;
     g_state.inputBuf[0] = '\0';
+    g_state.inputCursorPos = 0;
 }
 
-// Delete last character
+// Insert text at cursor position in display buffer
+static void calcInsertAtCursor(const std::string& text) {
+    int pos = g_state.inputCursorPos;
+    if (pos < 0) pos = 0;
+    if (pos > (int)g_state.display.size()) pos = (int)g_state.display.size();
+    g_state.display.insert(pos, text);
+    g_state.inputCursorPos = pos + (int)text.size();
+}
+
+// Delete last character (or at cursor position)
 void calcDelete() {
     if (g_state.hasResult) {
         calcClear();
         return;
     }
     if (!g_state.display.empty()) {
-        g_state.display.pop_back();
+        int pos = g_state.inputCursorPos;
+        if (pos > 0) {
+            g_state.display.erase(pos - 1, 1);
+            g_state.inputCursorPos = pos - 1;
+        }
     }
 }
 
@@ -246,30 +260,32 @@ void calcToggleAngleMode() {
 void calcInsertAns() {
     if (g_state.hasResult) {
         g_state.display.clear();
+        g_state.inputCursorPos = 0;
         g_state.hasResult = false;
     }
-    g_state.display += g_state.lastAns;
+    calcInsertAtCursor(g_state.lastAns);
 }
 
 // Insert a named constant (returns numeric value as string)
 void calcInsertConstant(const std::string& name) {
     if (g_state.hasResult) {
         g_state.display.clear();
+        g_state.inputCursorPos = 0;
         g_state.hasResult = false;
     }
 
     if (name == "pi") {
-        g_state.display += "3.141592653589793";
+        calcInsertAtCursor("3.141592653589793");
     } else if (name == "e") {
-        g_state.display += "2.718281828459045";
+        calcInsertAtCursor("2.718281828459045");
     } else if (name == "c") {
-        g_state.display += "299792458";
+        calcInsertAtCursor("299792458");
     } else if (name == "h") {
-        g_state.display += "6.62607015e-34";
+        calcInsertAtCursor("6.62607015e-34");
     } else if (name == "G") {
-        g_state.display += "6.67430e-11";
+        calcInsertAtCursor("6.67430e-11");
     } else if (name == "NA") {
-        g_state.display += "6.02214076e23";
+        calcInsertAtCursor("6.02214076e23");
     }
 }
 
@@ -277,6 +293,7 @@ void calcInsertConstant(const std::string& name) {
 void calcInsertRandom() {
     if (g_state.hasResult) {
         g_state.display.clear();
+        g_state.inputCursorPos = 0;
         g_state.hasResult = false;
     }
     static std::mt19937_64 rng(std::random_device{}());
@@ -284,7 +301,7 @@ void calcInsertRandom() {
     double r = dist(rng);
     std::ostringstream oss;
     oss << std::setprecision(12) << r;
-    g_state.display += oss.str();
+    calcInsertAtCursor(oss.str());
 }
 
 // Apply factorial: find n! patterns and replace with computed value
@@ -345,6 +362,7 @@ void calcKeyboardInput(int key, int mods) {
     auto startFresh = [&]() {
         if (g_state.hasResult) {
             g_state.display.clear();
+            g_state.inputCursorPos = 0;
             g_state.hasResult = false;
         }
     };
@@ -352,14 +370,14 @@ void calcKeyboardInput(int key, int mods) {
     // Digits
     if (key >= '0' && key <= '9') {
         startFresh();
-        g_state.display += (char)key;
+        calcInsertAtCursor(std::string(1, (char)key));
         return;
     }
 
     // Decimal point
     if (key == '.') {
         startFresh();
-        g_state.display += '.';
+        calcInsertAtCursor(".");
         return;
     }
 
@@ -367,52 +385,57 @@ void calcKeyboardInput(int key, int mods) {
     if (key == '+') {
         if (g_state.hasResult) {
             g_state.display = g_state.result;
+            g_state.inputCursorPos = (int)g_state.display.size();
             g_state.hasResult = false;
         }
-        g_state.display += '+';
+        calcInsertAtCursor("+");
         return;
     }
     if (key == '-') {
         if (g_state.hasResult) {
             g_state.display = g_state.result;
+            g_state.inputCursorPos = (int)g_state.display.size();
             g_state.hasResult = false;
         }
-        g_state.display += '-';
+        calcInsertAtCursor("-");
         return;
     }
     if (key == '*') {
         if (g_state.hasResult) {
             g_state.display = g_state.result;
+            g_state.inputCursorPos = (int)g_state.display.size();
             g_state.hasResult = false;
         }
-        g_state.display += '*';
+        calcInsertAtCursor("*");
         return;
     }
     if (key == '/') {
         if (g_state.hasResult) {
             g_state.display = g_state.result;
+            g_state.inputCursorPos = (int)g_state.display.size();
             g_state.hasResult = false;
         }
-        g_state.display += '/';
+        calcInsertAtCursor("/");
         return;
     }
     if (key == '^') {
         if (g_state.hasResult) {
             g_state.display = g_state.result;
+            g_state.inputCursorPos = (int)g_state.display.size();
             g_state.hasResult = false;
         }
-        g_state.display += '^';
+        calcInsertAtCursor("^");
         return;
     }
 
     // Parentheses
     if (key == '(') {
         startFresh();
-        g_state.display += '(';
+        calcInsertAtCursor("(");
         return;
     }
     if (key == ')') {
-        g_state.display += ')';
+        calcInsertAtCursor(")");
         return;
     }
 
@@ -434,16 +457,34 @@ void calcKeyboardInput(int key, int mods) {
         return;
     }
 
+    // Arrow keys for cursor navigation in the manual input buffer
+    if (key == 263) { // GLFW_KEY_LEFT
+        if (g_state.inputCursorPos > 0) g_state.inputCursorPos--;
+        return;
+    }
+    if (key == 262) { // GLFW_KEY_RIGHT
+        if (g_state.inputCursorPos < (int)g_state.display.size()) g_state.inputCursorPos++;
+        return;
+    }
+    if (key == 268) { // GLFW_KEY_HOME
+        g_state.inputCursorPos = 0;
+        return;
+    }
+    if (key == 269) { // GLFW_KEY_END
+        g_state.inputCursorPos = (int)g_state.display.size();
+        return;
+    }
+
     // Letter keys for functions
-    if (key == 's') { startFresh(); g_state.display += "sin("; return; }
-    if (key == 'c') { startFresh(); g_state.display += "cos("; return; }
-    if (key == 't') { startFresh(); g_state.display += "tan("; return; }
-    if (key == 'l') { startFresh(); g_state.display += "log("; return; }
-    if (key == 'n') { startFresh(); g_state.display += "ln("; return; }
-    if (key == 'r') { startFresh(); g_state.display += "sqrt("; return; }
+    if (key == 's') { startFresh(); calcInsertAtCursor("sin("); return; }
+    if (key == 'c') { startFresh(); calcInsertAtCursor("cos("); return; }
+    if (key == 't') { startFresh(); calcInsertAtCursor("tan("); return; }
+    if (key == 'l') { startFresh(); calcInsertAtCursor("log("); return; }
+    if (key == 'n') { startFresh(); calcInsertAtCursor("ln("); return; }
+    if (key == 'r') { startFresh(); calcInsertAtCursor("sqrt("); return; }
     // p and e now insert numeric constant values directly
-    if (key == 'e') { startFresh(); g_state.display += "2.718281828459045"; return; }
-    if (key == 'p') { startFresh(); g_state.display += "3.141592653589793"; return; }
+    if (key == 'e') { startFresh(); calcInsertAtCursor("2.718281828459045"); return; }
+    if (key == 'p') { startFresh(); calcInsertAtCursor("3.141592653589793"); return; }
 }
 
 // Handle button press from UI
@@ -473,17 +514,19 @@ void calcOnButton(const std::string& label) {
     if (label == "!") {
         if (g_state.hasResult) {
             g_state.display.clear();
+            g_state.inputCursorPos = 0;
             g_state.hasResult = false;
         }
-        g_state.display += "!";
+        calcInsertAtCursor("!");
         return;
     }
     if (label == "%") {
         if (g_state.hasResult) {
             g_state.display.clear();
+            g_state.inputCursorPos = 0;
             g_state.hasResult = false;
         }
-        g_state.display += "%";
+        calcInsertAtCursor("%");
         return;
     }
 
@@ -506,13 +549,14 @@ void calcOnButton(const std::string& label) {
     if (label == "(") {
         if (g_state.hasResult) {
             g_state.display.clear();
+            g_state.inputCursorPos = 0;
             g_state.hasResult = false;
         }
-        g_state.display += "(";
+        calcInsertAtCursor("(");
         return;
     }
     if (label == ")") {
-        g_state.display += ")";
+        calcInsertAtCursor(")");
         return;
     }
 
@@ -520,9 +564,10 @@ void calcOnButton(const std::string& label) {
     if (label == "e") {
         if (g_state.hasResult) {
             g_state.display.clear();
+            g_state.inputCursorPos = 0;
             g_state.hasResult = false;
         }
-        g_state.display += "2.718281828459045";
+        calcInsertAtCursor("2.718281828459045");
         return;
     }
 
@@ -531,9 +576,11 @@ void calcOnButton(const std::string& label) {
         // After result, operators continue, everything else starts fresh
         if (label == "+" || label == "-" || label == "×" || label == "÷" || label == "^") {
             g_state.display = g_state.result;
+            g_state.inputCursorPos = (int)g_state.display.size();
             g_state.hasResult = false;
         } else {
             g_state.display.clear();
+            g_state.inputCursorPos = 0;
             g_state.hasResult = false;
             g_state.error.clear();
         }
@@ -541,29 +588,29 @@ void calcOnButton(const std::string& label) {
 
     // Map display symbols to evaluation symbols
     if (label == "×") {
-        g_state.display += "*";
+        calcInsertAtCursor("*");
     } else if (label == "÷") {
-        g_state.display += "/";
+        calcInsertAtCursor("/");
     } else if (label == "x²") {
-        g_state.display += "^2";
+        calcInsertAtCursor("^2");
     } else if (label == "x^y") {
-        g_state.display += "^";
+        calcInsertAtCursor("^");
     } else if (label == "sin") {
-        g_state.display += "sin(";
+        calcInsertAtCursor("sin(");
     } else if (label == "cos") {
-        g_state.display += "cos(";
+        calcInsertAtCursor("cos(");
     } else if (label == "tan") {
-        g_state.display += "tan(";
+        calcInsertAtCursor("tan(");
     } else if (label == "log") {
-        g_state.display += "log(";
+        calcInsertAtCursor("log(");
     } else if (label == "ln") {
-        g_state.display += "ln(";
+        calcInsertAtCursor("ln(");
     } else if (label == "√") {
-        g_state.display += "sqrt(";
+        calcInsertAtCursor("sqrt(");
     } else if (label == "exp") {
-        g_state.display += "exp(";
+        calcInsertAtCursor("exp(");
     } else {
-        g_state.display += label;
+        calcInsertAtCursor(label);
     }
 }
 
