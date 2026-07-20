@@ -9,6 +9,7 @@
 #include "imgui_impl_vulkan.h"
 #include <iostream>
 #include <cstring>
+#include <cstdio>
 
 // Global state instance
 CalcState g_state;

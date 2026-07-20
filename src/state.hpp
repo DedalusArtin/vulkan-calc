@@ -43,7 +43,7 @@ struct CalcExtension {
 // ============================================================
 struct CalcState {
     // Language
-    Lang lang = LANG_ZH; // Default to Chinese on WSL
+    Lang lang = LANG_EN; // Overridden by detectLang() on startup
 
     // Display
     std::string display = "";  // Current expression being typed
