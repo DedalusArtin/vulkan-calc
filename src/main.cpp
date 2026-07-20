@@ -63,6 +63,7 @@ int main() {
     rangeBuilder.AddChar(U'\u2264'); // ≤
     rangeBuilder.AddChar(U'\u2265'); // ≥
     rangeBuilder.AddChar(U'\u20AC'); // € Euro
+    rangeBuilder.AddChar(U'\u2588'); // █ Full Block (legend bullet)
     ImVector<ImWchar> fullRanges;
     rangeBuilder.BuildRanges(&fullRanges);
 

@@ -904,16 +904,29 @@ static void drawIntegralFill(ImDrawList* dl, ImVec2 o, ImVec2 sz,
 
     pts.push_back(ts(b, 0));
 
-    // Draw filled polygon
-    ImU32 fillCol = IM_COL32(255, 180, 60, 60);
-    ImU32 borderCol = IM_COL32(255, 180, 60, 150);
+    // Draw vertical line fill (preventing color overlap)
+    ImU32 fillCol = IM_COL32(255, 180, 60, 80);
+    ImU32 borderCol = IM_COL32(255, 180, 60, 200);
 
     if (pts.size() >= 3) {
-        dl->AddConvexPolyFilled(pts.data(), (int)pts.size(), fillCol);
+        // Draw vertical lines from baseline (y=0) to curve, every 3 pixels
+        float stepPx = 3.0f;
+        for (float px = 0; px < (b - a) * (sz.x / (xMax - xMin)); px += stepPx) {
+            double x = a + px / (sz.x / (xMax - xMin));
+            double y = eval.evaluate(x);
+            if (!std::isfinite(y)) y = 0;
+            if (y < yMin) y = yMin;
+            if (y > yMax) y = yMax;
+            ImVec2 top = ts(x, y);
+            ImVec2 bot = ts(x, 0);
+            dl->AddLine(top, bot, fillCol, 1.5f);
+        }
         // Draw outline along the curve
         for (size_t i = 2; i < pts.size() - 1; i++) {
-            dl->AddLine(pts[i-1], pts[i], borderCol, 1.5f);
+            dl->AddLine(pts[i-1], pts[i], borderCol, 2.0f);
         }
+        // Also draw the baseline
+        dl->AddLine(pts.front(), pts.back(), IM_COL32(255, 180, 60, 100), 1.0f);
     }
 }
 
@@ -1554,6 +1567,15 @@ void renderAdvancedTabContent() {
                 if (ImGui::IsItemHovered()) {
                     ImGui::SetTooltip("%s",
                         T("Click to expand plot", "点击放大图像", "クリックして拡大"));
+                }
+                // Explicit enlarge button
+                ImGui::SetCursorScreenPos(ImVec2(po.x, po.y + ps.y + 4));
+                if (ImGui::Button(T("🔍 Enlarge##fourierExp", "🔍 放大##fourierExp", "🔍 拡大##fourierExp"), ImVec2(80, 24))) {
+                    g_state.showLargePlot = true;
+                    g_state.largePlotXMin = xM; g_state.largePlotXMax = xX;
+                    g_state.largePlotYMin = yM; g_state.largePlotYMax = yX;
+                    g_state.largePlotDirty = true;
+                    g_state.largePlotData = g_state.fourierPlots;
                 }
             }
         }
