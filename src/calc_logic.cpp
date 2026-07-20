@@ -1435,7 +1435,13 @@ bool saveExchangeRatesCache() {
 
 // Load exchange rates from cache file
 bool loadExchangeRatesCache() {
-    std::string cachePath = std::string(getenv("HOME")) + "/.codex/exchange_rates.json";
+#ifdef _WIN32
+    const char* homeDir = getenv("USERPROFILE");
+#else
+    const char* homeDir = getenv("HOME");
+#endif
+    if (!homeDir) return false;
+    std::string cachePath = std::string(homeDir) + "/.codex/exchange_rates.json";
 
     std::ifstream ifs(cachePath);
     if (!ifs.is_open()) return false;

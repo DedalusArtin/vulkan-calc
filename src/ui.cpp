@@ -3,6 +3,7 @@
 #include "locale.hpp"
 #include "state.hpp"
 #include "imgui.h"
+#include <iostream>
 #include <cmath>
 #include <numbers>
 #include <sstream>

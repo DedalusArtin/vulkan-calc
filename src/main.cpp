@@ -265,7 +265,6 @@ int main() {
 
     // ============================================================
     // MAIN LOOP
-    // --- Main loop ---
     while (!glfwWindowShouldClose(w)) {
         try {
         glfwPollEvents();
