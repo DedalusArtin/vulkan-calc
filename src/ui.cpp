@@ -462,8 +462,7 @@ void renderTopBar() {
         g_state.showAdvanced = true;
         g_state.showHistory = false;
         g_state.showConstants = false;
-        // Focus Fourier tab (index 1)
-        // Use a simple approach: open advanced and set a hint
+        g_state.advTab = 1;
     }
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", T("Fourier Series", "傅里叶级数", "フーリエ級数"));
@@ -477,6 +476,7 @@ void renderTopBar() {
         g_state.showAdvanced = true;
         g_state.showHistory = false;
         g_state.showConstants = false;
+        g_state.advTab = 2;
     }
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", T("Complex Analysis", "复分析", "複素解析"));
@@ -490,9 +490,52 @@ void renderTopBar() {
         g_state.showAdvanced = true;
         g_state.showHistory = false;
         g_state.showConstants = false;
+        g_state.advTab = 0;
     }
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", T("Calculus", "微积分", "微積分"));
+    }
+
+    ImGui::SameLine(0, 2);
+
+    // Probability quick button
+    if (styledButton(T("P##pb", "概##pb", "確##pb"),
+                     COL_BTN_TOOL, COL_BTN_TOOL_H, COL_BTN_TOOL_A, ImVec2(28, 26))) {
+        g_state.showAdvanced = true;
+        g_state.showHistory = false;
+        g_state.showConstants = false;
+        g_state.advTab = 4;
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", T("Probability & Statistics", "概率统计", "確率統計"));
+    }
+
+    ImGui::SameLine(0, 2);
+
+    // 3D Surface quick button
+    if (styledButton(T("3D##3db", "3D##3db", "3D##3db"),
+                     COL_BTN_TOOL, COL_BTN_TOOL_H, COL_BTN_TOOL_A, ImVec2(28, 26))) {
+        g_state.showAdvanced = true;
+        g_state.showHistory = false;
+        g_state.showConstants = false;
+        g_state.advTab = 5;
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", T("3D Surface", "3D曲面", "3D曲面"));
+    }
+
+    ImGui::SameLine(0, 2);
+
+    // Extension quick button
+    if (styledButton(T("Ext##eb", "扩##eb", "拡##eb"),
+                     COL_BTN_TOOL, COL_BTN_TOOL_H, COL_BTN_TOOL_A, ImVec2(28, 26))) {
+        g_state.showAdvanced = true;
+        g_state.showHistory = false;
+        g_state.showConstants = false;
+        g_state.advTab = 6;
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", T("Extension API", "扩展插件", "拡張プラグイン"));
     }
 
     ImGui::SameLine(0, 8);
@@ -769,28 +812,39 @@ static void drawPlot(ImDrawList* dl, ImVec2 o, ImVec2 sz,
 void renderAdvancedModal() {
     if (!g_state.showAdvanced) return;
 
-    ImGui::SetNextWindowSize(ImVec2(680, 520), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(720, 600), ImGuiCond_FirstUseEver);
     ImGui::Begin(T("Advanced Mode##adv", "高级模式##adv", "応用モード##adv"),
-                 &g_state.showAdvanced,
-                 ImGuiWindowFlags_NoResize);
+                 &g_state.showAdvanced);
 
     // Tabs inside the advanced window
-    static int advTab = 0;
     const char* tabNames[] = {
         T("Calculus##t0", "微积分##t0", "微積分##t0"),
         T("Fourier##t1", "傅里叶##t1", "フーリエ##t1"),
         T("Complex##t2", "复变函数##t2", "複素関数##t2"),
-        T("Domain##t3", "域着色##t3", "領域彩色##t3")
+        T("Domain##t3", "域着色##t3", "領域彩色##t3"),
+        T("ProbStats##t4", "概率统计##t4", "確率統計##t4"),
+        T("3DSurface##t5", "3D曲面##t5", "3D曲面##t5"),
+        T("Ext##t6", "扩展##t6", "拡張##t6")
     };
+    int tabCount = 7;
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < tabCount; i++) {
         if (i > 0) ImGui::SameLine();
-        if (ImGui::RadioButton(tabNames[i], &advTab, i)) {}
+        bool sel = (g_state.advTab == i);
+        if (sel) {
+            ImGui::PushStyleColor(ImGuiCol_Button, COL_BTN_FUNC);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, COL_BTN_FUNC_H);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, COL_BTN_FUNC_A);
+        }
+        if (ImGui::Button(tabNames[i])) {
+            g_state.advTab = i;
+        }
+        if (sel) ImGui::PopStyleColor(3);
     }
     ImGui::Separator();
 
     // ---- Calculus Tab ----
-    if (advTab == 0) {
+    if (g_state.advTab == 0) {
         ImGui::Text("%s", T("Expression f(x) =", "表达式 f(x) =", "式 f(x) ="));
 
         char buf[1024];
@@ -916,10 +970,297 @@ void renderAdvancedModal() {
             }
         }
         ImGui::EndChild();
+
+        // ---- Derivative Graph Improvements ----
+        ImGui::Separator();
+        ImGui::TextColored(ImVec4(0.3f, 0.8f, 1, 1), "=== %s ===",
+                           T("Derivative Graph", "导数图像", "導関数グラフ"));
+        if (ImGui::Button(T("f'(x)##der1", "f'(x)##der1", "f'(x)##der1"))) {
+            g_state.plotMode = CalcState::PLOT_DERIV;
+            g_state.plots = PlotGenerator::generateMultiple(
+                {[&](double x) {
+                    g_state.evaluator.setExpression(g_state.display);
+                    return g_state.evaluator.evaluate(x);
+                }},
+                g_state.plotXMin, g_state.plotXMax, 500);
+            auto deriv = [&](double x) {
+                return Differentiator::derivative(
+                    [&](double t) {
+                        g_state.evaluator.setExpression(g_state.display);
+                        return g_state.evaluator.evaluate(t);
+                    },
+                    x).value;
+            };
+            g_state.plots.push_back(
+                PlotGenerator::generate(deriv, g_state.plotXMin, g_state.plotXMax,
+                                        500, "f'(x)"));
+            // Find zero crossings and extremes
+            g_state.derivZeroPts = findZeroCrossings(deriv, g_state.plotXMin, g_state.plotXMax, 500);
+            g_state.derivExtremePts = findLocalExtremes(
+                [&](double x) {
+                    g_state.evaluator.setExpression(g_state.display);
+                    return g_state.evaluator.evaluate(x);
+                },
+                g_state.plotXMin, g_state.plotXMax, 500);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(T("f''(x)##der2", "f''(x)##der2", "f''(x)##der2"))) {
+            g_state.plotMode = CalcState::PLOT_DERIV;
+            g_state.plots = PlotGenerator::generateMultiple(
+                {[&](double x) {
+                    g_state.evaluator.setExpression(g_state.display);
+                    return g_state.evaluator.evaluate(x);
+                }},
+                g_state.plotXMin, g_state.plotXMax, 500);
+            auto f = [&](double x) {
+                g_state.evaluator.setExpression(g_state.display);
+                return g_state.evaluator.evaluate(x);
+            };
+            auto deriv1 = [&](double x) {
+                return Differentiator::derivative(f, x).value;
+            };
+            auto deriv2 = [&](double x) {
+                return Differentiator::derivative(deriv1, x).value;
+            };
+            g_state.plots.push_back(
+                PlotGenerator::generate(deriv1, g_state.plotXMin, g_state.plotXMax,
+                                        500, "f'(x)"));
+            g_state.plots.push_back(
+                PlotGenerator::generate(deriv2, g_state.plotXMin, g_state.plotXMax,
+                                        500, "f''(x)"));
+            g_state.derivZeroPts = findZeroCrossings(deriv1, g_state.plotXMin, g_state.plotXMax, 500);
+            g_state.derivExtremePts = findLocalExtremes(f, g_state.plotXMin, g_state.plotXMax, 500);
+        }
+        // Show derivative zero points and extremes info
+        if (!g_state.derivZeroPts.empty()) {
+            std::string info = T("Zeros of f'(x): ", "f'(x)的零点: ", "f'(x)の零点: ");
+            std::ostringstream oss;
+            for (size_t i = 0; i < g_state.derivZeroPts.size() && i < 5; i++) {
+                if (i > 0) oss << ", ";
+                oss.precision(3);
+                oss << std::fixed << g_state.derivZeroPts[i];
+            }
+            if (g_state.derivZeroPts.size() > 5) oss << "...";
+            ImGui::TextColored(ImVec4(0.4f, 0.6f, 1, 1), "%s%s", info.c_str(), oss.str().c_str());
+        }
+        if (!g_state.derivExtremePts.empty()) {
+            std::string info = T("Extreme points: ", "极值点: ", "極値点: ");
+            std::ostringstream oss;
+            for (size_t i = 0; i < g_state.derivExtremePts.size() && i < 5; i++) {
+                if (i > 0) oss << ", ";
+                oss.precision(3);
+                oss << std::fixed << g_state.derivExtremePts[i];
+            }
+            if (g_state.derivExtremePts.size() > 5) oss << "...";
+            ImGui::TextColored(ImVec4(1, 0.6f, 0.3f, 1), "%s%s", info.c_str(), oss.str().c_str());
+        }
+
+        // ---- Volume Calculation ----
+        ImGui::Separator();
+        ImGui::TextColored(ImVec4(0.3f, 0.8f, 1, 1), "=== %s ===",
+                           T("Volume Calculation", "物体体积计算", "体積計算"));
+
+        const char* volNames[] = {
+            T("Revolution##vt0", "旋转体##vt0", "回転体##vt0"),
+            T("Sphere##vt1", "球体##vt1", "球体##vt1"),
+            T("Cylinder##vt2", "圆柱##vt2", "円柱##vt2"),
+            T("Cone##vt3", "圆锥##vt3", "円錐##vt3"),
+            T("Box##vt4", "长方体##vt4", "直方体##vt4")
+        };
+        for (int i = 0; i < 5; i++) {
+            if (i > 0) ImGui::SameLine();
+            if (ImGui::RadioButton(volNames[i], &g_state.volType, i)) {}
+        }
+
+        if (g_state.volType == 0) {
+            // Revolution
+            ImGui::Text("%s", T("f(x) = expression entered above", "f(x) = 上方输入的表达式", "f(x) = 上で入力した式"));
+            ImGui::Text("%s", T("Around x-axis: V = π∫[f(x)]²dx", "绕x轴: V = π∫[f(x)]²dx", "x軸周り: V = π∫[f(x)]²dx"));
+            ImGui::SetNextItemWidth(80);
+            ImGui::InputDouble(T("a (lower)##va", "a (下限)##va", "a (下限)##va"), &g_state.revA, 0, 0, "%.3f");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(80);
+            ImGui::InputDouble(T("b (upper)##vb", "b (上限)##vb", "b (上限)##vb"), &g_state.revB, 0, 0, "%.3f");
+            ImGui::SameLine();
+            if (ImGui::Button(T("Calc V##vc", "计算体积##vc", "体積計算##vc"))) {
+                // V = π∫[f(x)]²dx
+                auto r = Integrator::adaptiveSimpson(
+                    [&](double x) {
+                        g_state.evaluator.setExpression(g_state.display);
+                        double fv = g_state.evaluator.evaluate(x);
+                        return fv * fv;
+                    },
+                    g_state.revA, g_state.revB);
+                std::ostringstream oss;
+                oss.precision(6);
+                oss << "V = π * " << r.value << " = " << (std::numbers::pi * r.value);
+                g_state.volResult = oss.str();
+                g_state.volFormula = "V = π∫[" + g_state.display + "]² dx";
+            }
+        } else if (g_state.volType == 1) {
+            // Sphere
+            ImGui::Text("V = 4/3 · π · r³");
+            ImGui::SetNextItemWidth(80);
+            ImGui::InputDouble(T("r##vs", "半径 r##vs", "半径 r##vs"), &g_state.sphereR, 0, 0, "%.2f");
+            ImGui::SameLine();
+            if (ImGui::Button(T("Calc V##vsb", "计算体积##vsb", "体積計算##vsb"))) {
+                double v = sphereVolume(g_state.sphereR);
+                std::ostringstream oss;
+                oss.precision(6);
+                oss << "V = 4/3·π·(" << g_state.sphereR << ")³ = " << v;
+                g_state.volResult = oss.str();
+                g_state.volFormula = "V = 4/3 · π · r³";
+            }
+        } else if (g_state.volType == 2) {
+            // Cylinder
+            ImGui::Text("V = π · r² · h");
+            ImGui::SetNextItemWidth(80);
+            ImGui::InputDouble(T("r##vc1", "半径 r##vc1", "半径 r##vc1"), &g_state.cylR, 0, 0, "%.2f");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(80);
+            ImGui::InputDouble(T("h##vc2", "高度 h##vc2", "高さ h##vc2"), &g_state.cylH, 0, 0, "%.2f");
+            ImGui::SameLine();
+            if (ImGui::Button(T("Calc V##vcb", "计算体积##vcb", "体積計算##vcb"))) {
+                double v = cylinderVolume(g_state.cylR, g_state.cylH);
+                std::ostringstream oss;
+                oss.precision(6);
+                oss << "V = π·(" << g_state.cylR << ")²·" << g_state.cylH << " = " << v;
+                g_state.volResult = oss.str();
+                g_state.volFormula = "V = π · r² · h";
+            }
+        } else if (g_state.volType == 3) {
+            // Cone
+            ImGui::Text("V = 1/3 · π · r² · h");
+            ImGui::SetNextItemWidth(80);
+            ImGui::InputDouble(T("r##vco1", "半径 r##vco1", "半径 r##vco1"), &g_state.coneR, 0, 0, "%.2f");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(80);
+            ImGui::InputDouble(T("h##vco2", "高度 h##vco2", "高さ h##vco2"), &g_state.coneH, 0, 0, "%.2f");
+            ImGui::SameLine();
+            if (ImGui::Button(T("Calc V##vcob", "计算体积##vcob", "体積計算##vcob"))) {
+                double v = coneVolume(g_state.coneR, g_state.coneH);
+                std::ostringstream oss;
+                oss.precision(6);
+                oss << "V = 1/3·π·(" << g_state.coneR << ")²·" << g_state.coneH << " = " << v;
+                g_state.volResult = oss.str();
+                g_state.volFormula = "V = 1/3 · π · r² · h";
+            }
+        } else if (g_state.volType == 4) {
+            // Box
+            ImGui::Text("V = a · b · c");
+            ImGui::SetNextItemWidth(60);
+            ImGui::InputDouble("a##vb1", &g_state.boxA, 0, 0, "%.2f");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(60);
+            ImGui::InputDouble("b##vb2", &g_state.boxB, 0, 0, "%.2f");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(60);
+            ImGui::InputDouble("c##vb3", &g_state.boxC, 0, 0, "%.2f");
+            ImGui::SameLine();
+            if (ImGui::Button(T("Calc V##vbb", "计算体积##vbb", "体積計算##vbb"))) {
+                double v = boxVolume(g_state.boxA, g_state.boxB, g_state.boxC);
+                std::ostringstream oss;
+                oss.precision(6);
+                oss << "V = " << g_state.boxA << "·" << g_state.boxB << "·" << g_state.boxC << " = " << v;
+                g_state.volResult = oss.str();
+                g_state.volFormula = "V = a · b · c";
+            }
+        }
+        if (!g_state.volFormula.empty()) {
+            ImGui::TextColored(ImVec4(0.6f, 0.6f, 1, 1), "%s", T("Formula: ", "公式: ", "公式: "));
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.4f, 0.8f, 0.4f, 1), "%s", g_state.volFormula.c_str());
+        }
+        if (!g_state.volResult.empty()) {
+            ImGui::TextColored(ImVec4(0.2f, 1, 0.4f, 1), "V = %s", g_state.volResult.c_str());
+        }
+
+        // ---- Surface Integral (Monte Carlo) ----
+        ImGui::Separator();
+        ImGui::TextColored(ImVec4(0.3f, 0.8f, 1, 1), "=== %s ===",
+                           T("Surface Integral (MC)", "曲面积分(蒙特卡洛)", "面積分(モンテカルロ)"));
+
+        const char* surfNames[] = {
+            T("Sphere##st0", "球面##st0", "球面##st0"),
+            T("Cylinder##st1", "柱面##st1", "円柱面##st1"),
+            T("Plane##st2", "平面##st2", "平面##st2"),
+            T("Custom##st3", "自定义##st3", "カスタム##st3")
+        };
+        for (int i = 0; i < 4; i++) {
+            if (i > 0) ImGui::SameLine();
+            if (ImGui::RadioButton(surfNames[i], &g_state.surfType, i)) {}
+        }
+
+        ImGui::Text("f(x,y,z) =");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(200);
+        ImGui::InputText("##surfFunc", g_state.surfFunc, sizeof(g_state.surfFunc));
+
+        ImGui::SetNextItemWidth(60);
+        ImGui::InputDouble(T("u min##su1", "u 最小##su1", "u 最小##su1"), &g_state.surfA, 0, 0, "%.2f");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(60);
+        ImGui::InputDouble(T("u max##su2", "u 最大##su2", "u 最大##su2"), &g_state.surfB, 0, 0, "%.2f");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(60);
+        ImGui::InputDouble(T("v min##sv1", "v 最小##sv1", "v 最小##sv1"), &g_state.surfC, 0, 0, "%.2f");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(60);
+        ImGui::InputDouble(T("v max##sv2", "v 最大##sv2", "v 最大##sv2"), &g_state.surfD, 0, 0, "%.2f");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(80);
+        ImGui::SliderInt(T("Samples##sms", "采样数##sms", "サンプル数##sms"), &g_state.mcSamples, 100, 50000);
+
+        if (ImGui::Button(T("Compute ∬f dS##scb", "计算曲面积分##scb", "面積分を計算##scb"))) {
+            // Define parametric surfaces using std::function (assignable)
+            std::function<double(double,double)> px, py, pz;
+            px = [](double u, double v) -> double { return 0; };
+            py = [](double u, double v) -> double { return 0; };
+            pz = [](double u, double v) -> double { return 0; };
+
+            switch (g_state.surfType) {
+                case 0: // Sphere: r=1, u=θ[0,π], v=φ[0,2π]
+                    px = [](double u, double v) { return std::sin(u) * std::cos(v); };
+                    py = [](double u, double v) { return std::sin(u) * std::sin(v); };
+                    pz = [](double u, double v) { return std::cos(u); };
+                    break;
+                case 1: // Cylinder: r=1, h=2
+                    px = [](double u, double v) { return std::cos(u); };
+                    py = [](double u, double v) { return std::sin(u); };
+                    pz = [](double u, double v) { return v; };
+                    break;
+                case 2: // Plane: z=0
+                    px = [](double u, double v) { return u; };
+                    py = [](double u, double v) { return v; };
+                    pz = [](double u, double v) { return 0; };
+                    break;
+                case 3: // Custom
+                    px = [](double u, double v) { return u; };
+                    py = [](double u, double v) { return v; };
+                    pz = [&](double u, double v) { return eval3DFunc(g_state.surfFunc, u, v); };
+                    break;
+            }
+
+            double result = monteCarloSurfaceIntegral(
+                [](double x, double y, double z) { return x*x + y*y + z*z; },
+                px, py, pz,
+                g_state.surfA, g_state.surfB,
+                g_state.surfC, g_state.surfD,
+                g_state.mcSamples);
+
+            std::ostringstream oss;
+            oss.precision(6);
+            oss << "∬ f dS ≈ " << std::fixed << result
+                << "  (MC samples: " << g_state.mcSamples << ")";
+            g_state.surfResult = oss.str();
+        }
+        if (!g_state.surfResult.empty()) {
+            ImGui::TextColored(ImVec4(0.2f, 1, 0.4f, 1), "%s", g_state.surfResult.c_str());
+        }
     }
 
     // ---- Fourier Tab ----
-    if (advTab == 1) {
+    if (g_state.advTab == 1) {
         if (ImGui::RadioButton(T("Square##ft", "方波##ft", "方形波##ft"), &g_state.fourierType, 0))
             generateFourierPlot();
         ImGui::SameLine();
@@ -973,7 +1314,7 @@ void renderAdvancedModal() {
     }
 
     // ---- Complex Tab ----
-    if (advTab == 2) {
+    if (g_state.advTab == 2) {
         ImGui::TextUnformatted(T("Complex Analysis##ct", "复分析##ct", "複素解析##ct"));
 
         if (ImGui::Button(T("Cauchy ∮##cb", "柯西积分 ∮##cb", "コーシー積分 ∮##cb"))) {
@@ -1018,7 +1359,7 @@ void renderAdvancedModal() {
     }
 
     // ---- Domain Coloring Tab ----
-    if (advTab == 3) {
+    if (g_state.advTab == 3) {
         ImGui::TextUnformatted("f(z) =");
         ImGui::SameLine();
         char buf[128];
@@ -1097,6 +1438,348 @@ void renderAdvancedModal() {
                              "色相=偏角 輝度=絶対値"));
     }
 
+    // ---- Probability & Statistics Tab ----
+    if (g_state.advTab == 4) {
+        if (ImGui::BeginChild("##probContent", ImVec2(0, -1), true)) {
+            // --- Permutation & Combination ---
+            ImGui::TextColored(ImVec4(0.3f, 0.8f, 1, 1), "=== %s ===",
+                               T("Permutations & Combinations", "排列与组合", "順列と組合せ"));
+            ImGui::SetNextItemWidth(80);
+            ImGui::InputDouble(T("n##pc1", "n##pc1", "n##pc1"), (double*)&g_state.probN, 0, 0, "%.0f");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(80);
+            ImGui::InputDouble(T("k##pc2", "k##pc2", "k##pc2"), (double*)&g_state.probK, 0, 0, "%.0f");
+            ImGui::SameLine();
+            if (ImGui::Button(T("P(n,k)##pc3", "P(n,k)##pc3", "P(n,k)##pc3"))) {
+                if (g_state.probN >= g_state.probK && g_state.probK >= 0) {
+                    auto r = permutationLL(g_state.probN, g_state.probK);
+                    g_state.probPermResult = "P(" + std::to_string(g_state.probN) + "," +
+                                             std::to_string(g_state.probK) + ") = " + std::to_string(r);
+                } else {
+                    g_state.probPermResult = T("Invalid n,k", "无效参数", "無効なパラメータ");
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(T("C(n,k)##pc4", "C(n,k)##pc4", "C(n,k)##pc4"))) {
+                if (g_state.probN >= g_state.probK && g_state.probK >= 0) {
+                    auto r = combinationLL(g_state.probN, g_state.probK);
+                    g_state.probCombResult = "C(" + std::to_string(g_state.probN) + "," +
+                                             std::to_string(g_state.probK) + ") = " + std::to_string(r);
+                } else {
+                    g_state.probCombResult = T("Invalid n,k", "无效参数", "無効なパラメータ");
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(T("n! ##pc5", "n! ##pc5", "n! ##pc5"))) {
+                auto r = factorialLL(g_state.probN);
+                g_state.probFactResult = std::to_string(g_state.probN) + "! = " + std::to_string(r);
+            }
+            if (!g_state.probPermResult.empty())
+                ImGui::TextColored(ImVec4(0.2f, 1, 0.4f, 1), "%s", g_state.probPermResult.c_str());
+            if (!g_state.probCombResult.empty())
+                ImGui::TextColored(ImVec4(0.2f, 1, 0.4f, 1), "%s", g_state.probCombResult.c_str());
+            if (!g_state.probFactResult.empty())
+                ImGui::TextColored(ImVec4(0.2f, 1, 0.4f, 1), "%s", g_state.probFactResult.c_str());
+
+            ImGui::Separator();
+
+            // --- Binomial Distribution ---
+            ImGui::TextColored(ImVec4(0.3f, 0.8f, 1, 1), "=== %s ===",
+                               T("Binomial", "二项分布", "二項分布"));
+            ImGui::SetNextItemWidth(60);
+            ImGui::InputDouble(T("n##bd1", "n##bd1", "n##bd1"), (double*)&g_state.binomN, 0, 0, "%.0f");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(60);
+            ImGui::InputDouble(T("k##bd2", "k##bd2", "k##bd2"), (double*)&g_state.binomK, 0, 0, "%.0f");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(80);
+            ImGui::InputDouble(T("p##bd3", "p##bd3", "p##bd3"), &g_state.binomP, 0.1, 0.5, "%.4f");
+            ImGui::SameLine();
+            if (ImGui::Button(T("P(X=k)##bd4", "P(X=k)##bd4", "P(X=k)##bd4"))) {
+                double p = binomialProb(g_state.binomN, g_state.binomK, g_state.binomP);
+                std::ostringstream oss;
+                oss.precision(6);
+                oss << "P(X=" << g_state.binomK << ") = " << std::fixed << p
+                    << " = " << (p * 100) << "%";
+                g_state.binomResult = oss.str();
+            }
+            if (!g_state.binomResult.empty())
+                ImGui::TextColored(ImVec4(0.2f, 1, 0.4f, 1), "%s", g_state.binomResult.c_str());
+
+            // --- Normal Distribution ---
+            ImGui::Separator();
+            ImGui::TextColored(ImVec4(0.3f, 0.8f, 1, 1), "=== %s ===",
+                               T("Normal Distribution", "正态分布", "正規分布"));
+            ImGui::SetNextItemWidth(60);
+            ImGui::InputDouble("x##nd1", &g_state.normX, 0, 0, "%.3f");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(60);
+            ImGui::InputDouble("μ##nd2", &g_state.normMu, 0, 0, "%.3f");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(60);
+            ImGui::InputDouble("σ##nd3", &g_state.normSigma, 0, 0, "%.3f");
+            ImGui::SameLine();
+            if (ImGui::Button(T("Φ(x)##nd4", "CDF Φ(x)##nd4", "CDF Φ(x)##nd4"))) {
+                double z = (g_state.normX - g_state.normMu) / g_state.normSigma;
+                double cdf = normalCDF(z);
+                std::ostringstream oss;
+                oss.precision(6);
+                oss << "Φ(" << g_state.normX << ") = " << std::fixed << cdf
+                    << " = " << (cdf * 100) << "%";
+                g_state.normCdfResult = oss.str();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(T("Inv Φ(p)##nd5", "逆Φ(p)##nd5", "逆Φ(p)##nd5"))) {
+                double inv = normalInv(g_state.normX);
+                double x = g_state.normMu + inv * g_state.normSigma;
+                std::ostringstream oss;
+                oss.precision(6);
+                oss << "Φ⁻¹(" << g_state.normX << ") = " << std::fixed << x;
+                g_state.normInvResult = oss.str();
+            }
+            if (!g_state.normCdfResult.empty())
+                ImGui::TextColored(ImVec4(0.2f, 1, 0.4f, 1), "%s", g_state.normCdfResult.c_str());
+            if (!g_state.normInvResult.empty())
+                ImGui::TextColored(ImVec4(0.2f, 1, 0.4f, 1), "%s", g_state.normInvResult.c_str());
+
+            // --- Poisson Distribution ---
+            ImGui::Separator();
+            ImGui::TextColored(ImVec4(0.3f, 0.8f, 1, 1), "=== %s ===",
+                               T("Poisson", "泊松分布", "ポアソン分布"));
+            ImGui::SetNextItemWidth(80);
+            ImGui::InputDouble("λ##pd1", &g_state.poisLambda, 0, 0, "%.3f");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(60);
+            ImGui::InputDouble("k##pd2", (double*)&g_state.poisK, 0, 0, "%.0f");
+            ImGui::SameLine();
+            if (ImGui::Button(T("P(X=k)##pd3", "P(X=k)##pd3", "P(X=k)##pd3"))) {
+                double p = poissonProb(g_state.poisLambda, g_state.poisK);
+                std::ostringstream oss;
+                oss.precision(6);
+                oss << "P(X=" << g_state.poisK << ") = " << std::fixed << p
+                    << " = " << (p * 100) << "%";
+                g_state.poisResult = oss.str();
+            }
+            if (!g_state.poisResult.empty())
+                ImGui::TextColored(ImVec4(0.2f, 1, 0.4f, 1), "%s", g_state.poisResult.c_str());
+
+            // --- Descriptive Statistics ---
+            ImGui::Separator();
+            ImGui::TextColored(ImVec4(0.3f, 0.8f, 1, 1), "=== %s ===",
+                               T("Descriptive Stats", "描述性统计", "記述統計"));
+            ImGui::Text("%s", T("Enter data (comma separated):",
+                               "输入数据（逗号分隔）:", "データ（カンマ区切り）:"));
+            ImGui::SetNextItemWidth(-1);
+            ImGui::InputTextMultiline("##statsData", g_state.statsDataBuf,
+                                      sizeof(g_state.statsDataBuf),
+                                      ImVec2(0, 50));
+            if (ImGui::Button(T("Calculate##stb", "计算统计##stb", "統計計算##stb"))) {
+                auto data = parseDataList(g_state.statsDataBuf);
+                if (data.size() >= 2) {
+                    auto s = calcDescriptiveStats(data);
+                    std::ostringstream oss;
+                    oss.precision(4);
+                    oss << std::fixed;
+                    oss << "数据个数: " << s.count << "\n";
+                    oss << "总和: " << s.sum << "\n";
+                    oss << "平均值: " << s.mean << "\n";
+                    oss << "中位数: " << s.median << "\n";
+                    oss << "众数: " << s.modeStr << "\n";
+                    oss << "方差: " << s.variance << "\n";
+                    oss << "标准差: " << s.stddev << "\n";
+                    oss << "最小值: " << s.minVal << "\n";
+                    oss << "最大值: " << s.maxVal << "\n";
+                    oss << "范围: " << s.range;
+                    g_state.statsResult = oss.str();
+                    // Store histogram data
+                    g_state.histData = data;
+                    g_state.histDirty = true;
+                } else if (data.size() == 1) {
+                    g_state.statsResult = T("Need at least 2 data points",
+                                           "至少需要2个数据点", "少なくとも2つのデータ点が必要");
+                } else {
+                    g_state.statsResult = T("No valid data entered",
+                                           "没有有效数据", "有効なデータがありません");
+                }
+            }
+            if (!g_state.statsResult.empty()) {
+                ImGui::BeginChild("##statsRes", ImVec2(0, 140), true);
+                ImGui::TextColored(ImVec4(0.2f, 1, 0.4f, 1), "%s", g_state.statsResult.c_str());
+                ImGui::EndChild();
+            }
+
+            // --- Histogram ---
+            ImGui::Separator();
+            ImGui::TextColored(ImVec4(0.3f, 0.8f, 1, 1), "=== %s ===",
+                               T("Histogram", "统计柱状图", "ヒストグラム"));
+            if (!g_state.histData.empty()) {
+                ImGui::SetNextItemWidth(200);
+                if (ImGui::SliderInt(T("Bins##hb", "分组数##hb", "区間数##hb"),
+                                     &g_state.histNBins, 3, 30)) {
+                    g_state.histDirty = true;
+                }
+                if (g_state.histDirty) {
+                    calcHistogram(g_state.histData, g_state.histNBins,
+                                  g_state.histCounts, g_state.histMin, g_state.histMax);
+                    g_state.histDirty = false;
+                }
+                ImVec2 hsz(ImGui::GetContentRegionAvail().x, 180);
+                if (hsz.x > 50 && hsz.y > 50) {
+                    if (ImGui::BeginChild("##histCanvas", hsz, true, ImGuiWindowFlags_NoScrollbar)) {
+                        auto* dl = ImGui::GetWindowDrawList();
+                        auto o = ImGui::GetCursorScreenPos();
+                        auto sz = ImGui::GetContentRegionAvail();
+                        drawHistogram(dl, o, sz, g_state.histCounts, g_state.histData,
+                                     g_state.histMin, g_state.histMax, g_state.histNBins);
+                    }
+                    ImGui::EndChild();
+                }
+            } else {
+                ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1), "%s",
+                                   T("Enter data above and calculate first",
+                                     "请先在上方输入数据并计算", "上でデータを入力して計算してください"));
+            }
+        }
+        ImGui::EndChild();
+    }
+
+    // ---- 3D Surface Tab ----
+    if (g_state.advTab == 5) {
+        ImGui::TextColored(ImVec4(0.3f, 0.8f, 1, 1), "=== %s ===",
+                           T("3D Surface Plot", "3D曲面图", "3Dサーフェス"));
+
+        ImGui::Text("f(x,y) =");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(300);
+        if (ImGui::InputText("##func3d", g_state.func3D, sizeof(g_state.func3D))) {
+            g_state.surf3DDirty = true;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(T("Update##3du", "更新##3du", "更新##3du"))) {
+            g_state.surf3DDirty = true;
+        }
+
+        // Rotation and zoom controls
+        ImGui::SetNextItemWidth(150);
+        if (ImGui::SliderFloat(T("Rot X##3rx", "旋转 X##3rx", "回転 X##3rx"),
+                               &g_state.rot3DX, -180, 180, "%.1f°")) {
+            g_state.surf3DDirty = true;
+        }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(150);
+        if (ImGui::SliderFloat(T("Rot Y##3ry", "旋转 Y##3ry", "回転 Y##3ry"),
+                               &g_state.rot3DY, -180, 180, "%.1f°")) {
+            g_state.surf3DDirty = true;
+        }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(100);
+        if (ImGui::SliderFloat(T("Zoom##3dz", "缩放##3dz", "ズーム##3dz"),
+                               &g_state.zoom3D, 0.1f, 5.0f, "%.1f")) {
+            g_state.surf3DDirty = true;
+        }
+
+        // Range controls
+        ImGui::SetNextItemWidth(80);
+        ImGui::InputDouble(T("Min##3dm", "最小##3dm", "最小##3dm"), &g_state.range3DMin, 0, 0, "%.1f");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(80);
+        ImGui::InputDouble(T("Max##3dx", "最大##3dx", "最大##3dx"), &g_state.range3DMax, 0, 0, "%.1f");
+        ImGui::SameLine();
+        if (ImGui::Button(T("Reset##3dr", "重置##3dr", "リセット##3dr"))) {
+            g_state.rot3DX = 30.0f; g_state.rot3DY = -30.0f;
+            g_state.zoom3D = 1.0f;
+            g_state.range3DMin = -5.0; g_state.range3DMax = 5.0;
+            g_state.surf3DDirty = true;
+        }
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.7f, 1), "%s",
+                           T("z: color(red=high, blue=low)",
+                             "z: 颜色(红=高, 蓝=低)",
+                             "z: 色(赤=高, 青=低)"));
+
+        // Reset dirty flag and get expression
+        g_state.surf3DDirty = false;
+        std::string funcExpr = g_state.func3D;
+
+        // Draw the 3D surface
+        ImVec2 gs(ImGui::GetContentRegionAvail().x, 0);
+        float minH = 320.0f;
+        if (gs.y < minH) gs.y = minH;
+        if (ImGui::BeginChild("##surf3dPlot", gs, true, ImGuiWindowFlags_NoScrollbar)) {
+            auto* dl = ImGui::GetWindowDrawList();
+            auto o = ImGui::GetCursorScreenPos();
+            auto sz = ImGui::GetContentRegionAvail();
+            if (sz.x > 50 && sz.y > 50) {
+                draw3DSurface(dl, o, sz, funcExpr,
+                             g_state.range3DMin, g_state.range3DMax,
+                             g_state.rot3DX, g_state.rot3DY, g_state.zoom3D);
+            }
+        }
+        ImGui::EndChild();
+    }
+
+    // ---- Extension Tab ----
+    if (g_state.advTab == 6) {
+        ImGui::TextColored(ImVec4(0.3f, 0.8f, 1, 1), "=== %s ===",
+                           T("Extension API", "扩展插件", "拡張プラグイン"));
+
+        // Extension selector
+        if (g_state.extensions.empty()) {
+            initExtensions();
+        }
+
+        const char* extNames[64];
+        int nExt = (int)g_state.extensions.size();
+        for (int i = 0; i < nExt && i < 64; i++) {
+            extNames[i] = g_state.extensions[i].name;
+        }
+        ImGui::SetNextItemWidth(200);
+        ImGui::Combo(T("Extension##es", "扩展##es", "拡張##es"),
+                     &g_state.extSelected, extNames, nExt);
+
+        if (g_state.extSelected >= 0 && g_state.extSelected < nExt) {
+            auto& ext = g_state.extensions[g_state.extSelected];
+            ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.8f, 1), "%s", ext.desc);
+            ImGui::SetNextItemWidth(300);
+            ImGui::InputText("##extInput", g_state.extInput, sizeof(g_state.extInput));
+            ImGui::SameLine();
+            if (ImGui::Button(T("Run##extr", "运行##extr", "実行##extr"))) {
+                if (g_state.extInput[0] != '\0') {
+                    g_state.extResult = ext.func(g_state.extInput);
+                } else if (ext.exampleInput) {
+                    g_state.extResult = ext.func(ext.exampleInput);
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(T("Example##exte", "示例##exte", "例##exte"))) {
+                if (ext.exampleInput) {
+                    strncpy(g_state.extInput, ext.exampleInput, sizeof(g_state.extInput) - 1);
+                    g_state.extInput[sizeof(g_state.extInput) - 1] = '\0';
+                    g_state.extResult = ext.func(ext.exampleInput);
+                }
+            }
+            ImGui::Separator();
+            // Result area
+            if (!g_state.extResult.empty()) {
+                ImVec2 rsz(0, 120);
+                if (ImGui::BeginChild("##extRes", rsz, true)) {
+                    ImGui::TextColored(ImVec4(0.2f, 1, 0.4f, 1), "%s", g_state.extResult.c_str());
+                }
+                ImGui::EndChild();
+            }
+        }
+
+        ImGui::Separator();
+        ImGui::TextColored(ImVec4(0.4f, 0.4f, 0.6f, 1), "%s",
+                           T("Extensions use a simple C function pointer API. "
+                             "Add new .h/.cpp files to add custom extensions.",
+                             "扩展使用简单的C函数指针API。添加.h/.cpp文件即可自定义扩展。",
+                             "拡張はシンプルなC関数ポインタAPIを使用します。.h/.cppファイルを追加してカスタム拡張を追加します。"));
+    }
+
+    // ---- Volume Calculation (embedded in calculus or standalone section) ----
+    // This section is shown directly in the calculus tab below the derivative stuff
+
     ImGui::End();
 }
 
@@ -1104,6 +1787,13 @@ void renderAdvancedModal() {
 // Main UI Render — adaptive to window size
 // ============================================================
 void renderUI() {
+    // Initialize built-in extensions on first call
+    static bool extsInitialized = false;
+    if (!extsInitialized) {
+        initExtensions();
+        extsInitialized = true;
+    }
+
     // Get actual window size from GLFW
     float winW = ImGui::GetIO().DisplaySize.x;
     float winH = ImGui::GetIO().DisplaySize.y;
@@ -1185,4 +1875,229 @@ void renderUI() {
     renderHistoryPanel();
     renderConstantsPanel();
     renderAdvancedModal();
+}
+
+// ============================================================
+// Histogram drawing helper
+// ============================================================
+void drawHistogram(ImDrawList* dl, ImVec2 o, ImVec2 sz,
+                   const std::vector<double>& counts,
+                   const std::vector<double>& data,
+                   double dataMin, double dataMax,
+                   int nBins)
+{
+    if (counts.empty() || nBins < 1) return;
+
+    // Background
+    dl->AddRectFilled(o, ImVec2(o.x + sz.x, o.y + sz.y), IM_COL32(8, 8, 14, 255));
+    dl->AddRect(o, ImVec2(o.x + sz.x, o.y + sz.y), IM_COL32(40, 40, 60, 200), 2.0f);
+
+    float margin = 40.0f;
+    float plotX = o.x + margin;
+    float plotY = o.y;
+    float plotW = sz.x - margin - 10.0f;
+    float plotH = sz.y - margin;
+
+    if (plotW < 10 || plotH < 10) return;
+
+    // Find max count
+    double maxCount = 0;
+    for (double c : counts) if (c > maxCount) maxCount = c;
+    if (maxCount <= 0) maxCount = 1;
+
+    double binWidth = (dataMax - dataMin) / nBins;
+    float barW = plotW / (float)nBins;
+
+    ImU32 barCol = IM_COL32(60, 140, 220, 220);
+    ImU32 barColH = IM_COL32(80, 180, 255, 220);
+    ImU32 axisCol = IM_COL32(100, 100, 140, 200);
+    ImU32 textCol = IM_COL32(140, 140, 180, 200);
+
+    // Draw bars
+    for (int i = 0; i < nBins && i < (int)counts.size(); i++) {
+        float barH = (float)(counts[i] / maxCount) * plotH;
+        float x1 = plotX + i * barW + 1;
+        float x2 = plotX + (i + 1) * barW - 1;
+        float y1 = plotY + plotH - barH;
+        float y2 = plotY + plotH;
+
+        dl->AddRectFilled(ImVec2(x1, y1), ImVec2(x2, y2), barCol, 2.0f);
+        dl->AddRect(ImVec2(x1, y1), ImVec2(x2, y2), barColH, 2.0f);
+
+        // Value label on top
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%.0f", counts[i]);
+        float tw = ImGui::CalcTextSize(buf).x;
+        dl->AddText(ImVec2(x1 + (barW - tw) / 2, y1 - 14), textCol, buf);
+    }
+
+    // X-axis line
+    dl->AddLine(ImVec2(plotX, plotY + plotH), ImVec2(plotX + plotW, plotY + plotH), axisCol);
+
+    // X-axis labels
+    for (int i = 0; i <= nBins && i <= 10; i++) {
+        int idx = i * nBins / 10;
+        if (idx > nBins) idx = nBins;
+        double val = dataMin + idx * binWidth;
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%.2g", val);
+        float x = plotX + idx * barW;
+        dl->AddLine(ImVec2(x, plotY + plotH), ImVec2(x, plotY + plotH + 4), axisCol);
+        float tw = ImGui::CalcTextSize(buf).x;
+        dl->AddText(ImVec2(x - tw / 2, plotY + plotH + 6), textCol, buf);
+    }
+
+    // Y-axis label
+    dl->AddText(ImVec2(o.x + 4, o.y + 4), textCol, "freq");
+
+    // Cumulative frequency curve (as overlay)
+    if (!data.empty() && nBins > 1) {
+        double total = (double)data.size();
+        double cumSum = 0;
+        ImVec2 prevPt(0, 0);
+        bool first = true;
+        for (int i = 0; i < nBins && i < (int)counts.size(); i++) {
+            cumSum += counts[i];
+            double frac = cumSum / total;
+            float x = plotX + (i + 0.5f) * barW;
+            float y = plotY + plotH * (float)(1.0 - frac);
+            if (!first) {
+                dl->AddLine(prevPt, ImVec2(x, y), IM_COL32(255, 200, 80, 200), 2.0f);
+            }
+            prevPt = ImVec2(x, y);
+            first = false;
+        }
+    }
+}
+
+// ============================================================
+// 3D Surface drawing helper — pseudo-3D isometric projection
+// ============================================================
+void draw3DSurface(ImDrawList* dl, ImVec2 o, ImVec2 sz,
+                   const std::string& expr,
+                   double xMin, double xMax,
+                   double rotX, double rotY,
+                   float zoom)
+{
+    int res = g_state.gridRes;
+    double xRange = xMax - xMin;
+    if (xRange <= 0) xRange = 1;
+
+    // Evaluate grid
+    std::vector<std::vector<double>> zGrid(res + 1, std::vector<double>(res + 1, 0));
+    double zMin = 1e30, zMax = -1e30;
+
+    for (int i = 0; i <= res; i++) {
+        for (int j = 0; j <= res; j++) {
+            double x = xMin + (double)i / res * xRange;
+            double y = xMin + (double)j / res * xRange;
+            double z = eval3DFunc(expr, x, y);
+            zGrid[i][j] = z;
+            if (z < zMin) zMin = z;
+            if (z > zMax) zMax = z;
+        }
+    }
+    if (zMax == zMin) { zMin -= 0.5; zMax += 0.5; }
+    double zRange = zMax - zMin;
+
+    // Rotation matrix (degrees → radians)
+    double rx = rotX * std::numbers::pi / 180.0;
+    double ry = rotY * std::numbers::pi / 180.0;
+    double cx = std::cos(rx), sx = std::sin(rx);
+    double cy = std::cos(ry), sy = std::sin(ry);
+
+    // Isometric projection: center of canvas
+    float cX = o.x + sz.x / 2;
+    float cY = o.y + sz.y / 2;
+    float scale = std::min(sz.x, sz.y) * 0.35f * zoom;
+
+    auto project = [&](double wx, double wy, double wz) -> ImVec2 {
+        // Apply rotation Y then X
+        double x1 = wx * cy - wz * sy;
+        double z1 = wx * sy + wz * cy;
+        double y1 = wy;
+        double z2 = z1 * cx - y1 * sx;
+        // Isometric-like: use x1 and z2 as screen coordinates
+        float sx2 = cX + (float)x1 * scale;
+        float sy2 = cY - (float)z2 * scale;
+        return ImVec2(sx2, sy2);
+    };
+
+    ImU32 gridLineCol = IM_COL32(60, 80, 120, 150);
+    ImU32 gridLineHi = IM_COL32(100, 140, 200, 200);
+
+    // Draw surface (back-to-front ordering for simple painter's algorithm)
+    // We use wireframe with colored faces
+    for (int i = 0; i < res; i++) {
+        for (int j = 0; j < res; j++) {
+            double x = xMin + (double)i / res * xRange;
+            double y = xMin + (double)j / res * xRange;
+
+            double z00 = zGrid[i][j];
+            double z10 = zGrid[i+1][j];
+            double z01 = zGrid[i][j+1];
+            double z11 = zGrid[i+1][j+1];
+
+            ImVec2 p00 = project(x, y, z00);
+            ImVec2 p10 = project(x + xRange/res, y, z10);
+            ImVec2 p01 = project(x, y + xRange/res, z01);
+            ImVec2 p11 = project(x + xRange/res, y + xRange/res, z11);
+
+            // Color based on height (z value)
+            float t0 = (float)((z00 - zMin) / zRange);
+            float t1 = (float)((z11 - zMin) / zRange);
+            float t = (t0 + t1) * 0.5f;
+            if (t < 0) t = 0; if (t > 1) t = 1;
+
+            int r = (int)(30 + 200 * t);
+            int g = (int)(60 + 150 * (1 - std::abs(t - 0.5) * 2));
+            int b = (int)(200 - 150 * t);
+            ImU32 faceCol = IM_COL32(r, g, b, 180);
+
+            // Draw filled quad as two triangles
+            dl->AddTriangleFilled(p00, p10, p11, faceCol);
+            dl->AddTriangleFilled(p00, p11, p01, faceCol);
+        }
+    }
+
+    // Draw grid lines on top
+    for (int i = 0; i <= res; i += std::max(1, res / 8)) {
+        for (int j = 0; j <= res; j += std::max(1, res / 8)) {
+            double x = xMin + (double)i / res * xRange;
+            double y = xMin + (double)j / res * xRange;
+            double z = zGrid[i][j];
+
+            // Line to neighbor
+            if (i < res) {
+                double z2 = zGrid[i+1][j];
+                ImVec2 p1 = project(x, y, z);
+                ImVec2 p2 = project(x + xRange/res, y, z2);
+                dl->AddLine(p1, p2, i % 4 == 0 ? gridLineHi : gridLineCol, 1.0f);
+            }
+            if (j < res) {
+                double z2 = zGrid[i][j+1];
+                ImVec2 p1 = project(x, y, z);
+                ImVec2 p2 = project(x, y + xRange/res, z2);
+                dl->AddLine(p1, p2, j % 4 == 0 ? gridLineHi : gridLineCol, 1.0f);
+            }
+        }
+    }
+
+    // Draw coordinate axes
+    ImU32 axisCol = IM_COL32(255, 100, 100, 220);
+    ImU32 axisColY = IM_COL32(100, 255, 100, 220);
+    ImU32 axisColZ = IM_COL32(100, 100, 255, 220);
+
+    double axisLen = xRange * 0.5;
+    ImVec2 origin = project(0, 0, 0);
+    ImVec2 xEnd = project(axisLen, 0, 0);
+    ImVec2 yEnd = project(0, axisLen, 0);
+    ImVec2 zEnd = project(0, 0, axisLen);
+
+    dl->AddLine(origin, xEnd, axisCol, 2.0f);
+    dl->AddLine(origin, yEnd, axisColY, 2.0f);
+    dl->AddLine(origin, zEnd, axisColZ, 2.0f);
+    dl->AddText(xEnd, axisCol, "x");
+    dl->AddText(yEnd, axisColY, "y");
+    dl->AddText(zEnd, axisColZ, "z");
 }
