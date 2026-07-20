@@ -3,6 +3,11 @@
 #include <cstring>
 #include <cstdio>
 #include <memory>
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#endif
 
 // ============================================================
 // Multi-language support
@@ -95,8 +100,14 @@ inline Lang detectLang() {
         }
     }
 
-    // 2. On WSL, probe Windows locale via PowerShell
-    //    Windows Chinese system returns "zh-CN"
+#ifdef _WIN32
+    // 2. Windows: use Win32 API (avoids _popen issues with 2>/dev/null redirect)
+    LANGID langId = GetUserDefaultUILanguage();
+    WORD primaryLang = PRIMARYLANGID(langId);
+    if (primaryLang == LANG_CHINESE) return LANG_ZH;
+    if (primaryLang == LANG_JAPANESE) return LANG_JA;
+#else
+    // 2. On WSL/Linux, probe Windows locale via PowerShell
     std::string winLocale = execShell(
         "powershell.exe -NoProfile -Command "
         "\"[System.Globalization.CultureInfo]::CurrentUICulture.Name\" 2>/dev/null"
@@ -107,8 +118,6 @@ inline Lang detectLang() {
         if (winLocale.find("ja") != std::string::npos ||
             winLocale.find("JA") != std::string::npos) return LANG_JA;
     }
-
-    // 3. Also try wmic (older Windows systems)
     std::string winLang = execShell(
         "powershell.exe -NoProfile -Command "
         "\"Get-WinSystemLocale | Select-Object -ExpandProperty Name\" 2>/dev/null"
@@ -117,7 +126,8 @@ inline Lang detectLang() {
         if (winLang.find("zh") != std::string::npos) return LANG_ZH;
         if (winLang.find("ja") != std::string::npos) return LANG_JA;
     }
+#endif
 
-    // 4. Default to English
+    // 3. Default to English
     return LANG_EN;
 }
