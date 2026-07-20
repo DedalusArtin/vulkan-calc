@@ -74,13 +74,24 @@ int main() {
     ImFont* f0 = io.Fonts->AddFontDefault();
 
     // Font sizes for various UI elements
-    // Try CJK font first with full ranges
-    const char* cjkPath = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc";
-    FILE* testFile = fopen(cjkPath, "rb");
+    // Try CJK font: check multiple locations (Linux/WSL path + Windows paths + exe dir)
+    const char* cjkCandidates[] = {
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",      // WSL/Linux
+        "./fonts/NotoSansCJK-Regular.ttc",                              // exe-relative
+        "../fonts/NotoSansCJK-Regular.ttc",
+        "C:\\Windows\\Fonts\\msyh.ttc",                                 // Windows YaHei
+        "C:\\Windows\\Fonts\\simsun.ttc",                               // Windows SimSun
+    };
+    const char* cjkPath = nullptr;
     bool haveCJK = false;
-    if (testFile) {
-        fclose(testFile);
-        haveCJK = true;
+    for (auto p : cjkCandidates) {
+        FILE* tf = fopen(p, "rb");
+        if (tf) {
+            fclose(tf);
+            cjkPath = p;
+            haveCJK = true;
+            break;
+        }
     }
 
     // Load all fonts with merged glyph ranges
