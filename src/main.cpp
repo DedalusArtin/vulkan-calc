@@ -111,7 +111,16 @@ int main() {
     ImFontGlyphRangesBuilder rangeBuilder;
     rangeBuilder.AddRanges(io.Fonts->GetGlyphRangesDefault());
     rangeBuilder.AddRanges(io.Fonts->GetGlyphRangesGreek());
-    rangeBuilder.AddRanges(io.Fonts->GetGlyphRangesChineseFull());
+    rangeBuilder.AddRanges(io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
+    // Add any additional CJK characters needed for the UI
+    rangeBuilder.AddChar(U'\u51FD'); // 函 (function)
+    rangeBuilder.AddChar(U'\u5F27'); // 弧 (radian arc)
+    rangeBuilder.AddChar(U'\u5FAE'); // 微 (calculus)
+    rangeBuilder.AddChar(U'\u79EF'); // 积 (integral)
+    rangeBuilder.AddChar(U'\u5BFC'); // 导 (derivative)
+    rangeBuilder.AddChar(U'\u6982'); // 概 (probability)
+    rangeBuilder.AddChar(U'\u7387'); // 率 (probability)
+    rangeBuilder.AddChar(U'\u7EDF'); // 统 (statistics)
     // Also add specific math symbols
     rangeBuilder.AddChar(U'\u03C0'); // π
     rangeBuilder.AddChar(U'\u222B'); // ∫ integral
