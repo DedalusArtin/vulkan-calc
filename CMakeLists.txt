@@ -127,7 +127,7 @@ if(WIN32)
             DEPENDS ${RC_SRC}
             COMMENT "Compiling resources (windres)"
         )
-        add_executable(vulkan_calc WIN32 ${PROJECT_SRC} ${PROJECT_HDR} ${IMGUI_SRC} ${RES_OUT})
+        add_executable(vulkan_calc ${PROJECT_SRC} ${PROJECT_HDR} ${IMGUI_SRC} ${RES_OUT})
     elseif(RC_COMPILER)
         # MSVC-style rc.exe
         set(RES_OUT ${CMAKE_CURRENT_BINARY_DIR}/resources.res)
@@ -137,17 +137,21 @@ if(WIN32)
             DEPENDS ${RC_SRC}
             COMMENT "Compiling resources (rc.exe)"
         )
-        add_executable(vulkan_calc WIN32 ${PROJECT_SRC} ${PROJECT_HDR} ${IMGUI_SRC} ${RES_OUT})
+        add_executable(vulkan_calc ${PROJECT_SRC} ${PROJECT_HDR} ${IMGUI_SRC} ${RES_OUT})
     else()
         # No resource compiler found, build without icon
         message(WARNING "No resource compiler (windres or rc) found. Building without icon.")
         add_executable(vulkan_calc ${PROJECT_SRC} ${PROJECT_HDR} ${IMGUI_SRC})
     endif()
 
-    # Console subsystem for GLFW (needs main())
+    # Console subsystem (needed by GLFW's main())
+    # Explicitly set CONSOLE — do NOT use WIN32 subsystem
     set_target_properties(vulkan_calc PROPERTIES
         WIN32_EXECUTABLE FALSE
     )
+    if(MSVC)
+        target_link_options(vulkan_calc PRIVATE /SUBSYSTEM:CONSOLE)
+    endif()
 else()
     add_executable(vulkan_calc ${PROJECT_SRC} ${PROJECT_HDR} ${IMGUI_SRC})
 endif()

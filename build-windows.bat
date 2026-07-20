@@ -7,7 +7,7 @@ setlocal enabledelayedexpansion
 
 set PROJECT_DIR=%~dp0
 set BUILD_DIR=%PROJECT_DIR%build-windows
-set OUTPUT_DIR=%PROJECT_DIR%dist
+set OUTPUT_DIR=F:\vulkan-calc
 
 echo ========================================
 echo Building VulkanCalc for Windows
