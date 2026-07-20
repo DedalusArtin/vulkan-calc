@@ -793,14 +793,51 @@ static void drawGrid(ImDrawList* dl, ImVec2 o, ImVec2 sz,
                      double xMin, double xMax,
                      double yMin, double yMax) {
     auto ts = makeToScreen(o, sz, xMin, xMax, yMin, yMax);
-    for (int i = 0; i <= 10; i++) {
-        double t = i / 10.0;
-        double x = xMin + t * (xMax - xMin), y = yMin + t * (yMax - yMin);
-        auto c = (std::abs(x) < 1e-9 || std::abs(y) < 1e-9)
-                     ? IM_COL32(80, 80, 110, 255)
-                     : IM_COL32(30, 30, 45, 200);
-        dl->AddLine(ts(x, yMin), ts(x, yMax), c);
-        dl->AddLine(ts(xMin, y), ts(xMax, y), c);
+
+    // Compute nice step sizes for grid lines
+    auto niceStep = [](double range, int targetTicks) -> double {
+        if (range <= 0) return 1.0;
+        double rough = range / targetTicks;
+        double e = std::floor(std::log10(rough));
+        double f = rough / std::pow(10, e);
+        double nice;
+        if (f < 1.5)      nice = 1.0;
+        else if (f < 3.5) nice = 2.0;
+        else if (f < 7.5) nice = 5.0;
+        else              nice = 10.0;
+        return nice * std::pow(10, e);
+    };
+
+    double xStep = niceStep(xMax - xMin, 8);
+    double yStep = niceStep(yMax - yMin, 8);
+    if (xStep <= 0) xStep = (xMax - xMin) / 8;
+    if (yStep <= 0) yStep = (yMax - yMin) / 8;
+
+    auto tc = IM_COL32(100, 100, 140, 200);
+    auto tcAxis = IM_COL32(120, 120, 180, 220);
+
+    // Draw vertical grid lines at each nice x position
+    double xStart = std::ceil(xMin / xStep) * xStep;
+    for (double v = xStart; v <= xMax; v += xStep) {
+        auto p = ts(v, 0);
+        if (p.x >= o.x && p.x <= o.x + sz.x) {
+            bool isZero = std::abs(v) < 1e-12;
+            ImU32 col = isZero ? tcAxis : tc;
+            float thickness = isZero ? 2.5f : 1.0f;
+            dl->AddLine(ImVec2(p.x, o.y), ImVec2(p.x, o.y + sz.y), col, thickness);
+        }
+    }
+
+    // Draw horizontal grid lines at each nice y position
+    double yStart = std::ceil(yMin / yStep) * yStep;
+    for (double v = yStart; v <= yMax; v += yStep) {
+        auto p = ts(0, v);
+        if (p.y >= o.y && p.y <= o.y + sz.y) {
+            bool isZero = std::abs(v) < 1e-12;
+            ImU32 col = isZero ? tcAxis : tc;
+            float thickness = isZero ? 2.5f : 1.0f;
+            dl->AddLine(ImVec2(o.x, p.y), ImVec2(o.x + sz.x, p.y), col, thickness);
+        }
     }
 }
 
@@ -808,19 +845,25 @@ static void drawAxesLabels(ImDrawList* dl, ImVec2 o, ImVec2 sz,
                            double xMin, double xMax,
                            double yMin, double yMax) {
     auto ts = makeToScreen(o, sz, xMin, xMax, yMin, yMax);
-    int nTicks = 6;
-    auto nice = [](double v) -> double {
-        double e = std::floor(std::log10(v));
-        double f = v / std::pow(10, e);
-        if (f < 1.5) return 1 * std::pow(10, e);
-        if (f < 3.5) return 2 * std::pow(10, e);
-        if (f < 7.5) return 5 * std::pow(10, e);
-        return 10 * std::pow(10, e);
+
+    // Same niceStep as drawGrid
+    auto niceStep = [](double range, int targetTicks) -> double {
+        if (range <= 0) return 1.0;
+        double rough = range / targetTicks;
+        double e = std::floor(std::log10(rough));
+        double f = rough / std::pow(10, e);
+        double nice;
+        if (f < 1.5)      nice = 1.0;
+        else if (f < 3.5) nice = 2.0;
+        else if (f < 7.5) nice = 5.0;
+        else              nice = 10.0;
+        return nice * std::pow(10, e);
     };
-    double xs = nice((xMax - xMin) / nTicks);
-    double ys = nice((yMax - yMin) / nTicks);
-    if (xs <= 0) xs = (xMax - xMin) / nTicks;
-    if (ys <= 0) ys = (yMax - yMin) / nTicks;
+
+    double xs = niceStep(xMax - xMin, 8);
+    double ys = niceStep(yMax - yMin, 8);
+    if (xs <= 0) xs = (xMax - xMin) / 8;
+    if (ys <= 0) ys = (yMax - yMin) / 8;
     auto tc = IM_COL32(100, 100, 140, 200);
     double xS = std::ceil(xMin / xs) * xs;
     double yS = std::ceil(yMin / ys) * ys;
