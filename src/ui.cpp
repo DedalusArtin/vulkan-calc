@@ -41,7 +41,7 @@ static const ImU32 COL_BTN_TOOL_H   = IM_COL32(60, 60, 80, 255);
 static const ImU32 COL_BTN_TOOL_A   = IM_COL32(80, 80, 100, 255);
 
 // Button layout constants
-static const float BTN_GAP = 4.0f;
+static const float BTN_GAP = 2.0f;
 static const int BTN_COLS = 5;
 
 // ============================================================
@@ -112,7 +112,7 @@ void renderLCD() {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     ImVec2 pos = ImGui::GetCursorScreenPos();
     float w = ImGui::GetContentRegionAvail().x;
-    float h = 185.0f;
+    float h = 150.0f;
 
     // Determine flash border color
     ImU32 borderCol = COL_LCD_BG;
@@ -337,65 +337,93 @@ void renderLCD() {
 // ============================================================
 void renderButtons() {
     float availW = ImGui::GetContentRegionAvail().x;
+    float availH = ImGui::GetContentRegionAvail().y;
     float btnW = (availW - (BTN_COLS - 1) * BTN_GAP) / (float)BTN_COLS;
-    float btnH = 46.0f;
+
+    // Dynamic button height based on available space (leave room for bottom graph)
+    int totalRows = 7;
+    float graphReserveH = 180.0f;
+    float btnAreaH = availH - graphReserveH - 8.0f;
+    float btnH = (btnAreaH - (totalRows - 1) * BTN_GAP) / (float)totalRows;
+    // Clamp to reasonable range
+    if (btnH < 50.0f) btnH = 50.0f;
+    if (btnH > 72.0f) btnH = 72.0f;
 
     auto sameLine = [&]() { ImGui::SameLine(0, BTN_GAP); };
     auto btnSize = ImVec2(btnW, btnH);
 
-    // Row 0: Blue function keys — USE UNIQUE IDs — parentheses with func keys
-    if (funcBtn("sin##r0c0")) calcOnButton("sin"); sameLine();
-    if (funcBtn("cos##r0c1")) calcOnButton("cos"); sameLine();
-    if (funcBtn("tan##r0c2")) calcOnButton("tan"); sameLine();
-    if (funcBtn("(##r0c3"))   calcOnButton("(");  sameLine();
-    if (funcBtn(")##r0c4"))   calcOnButton(")");
+    // Macros for fixed-size buttons
+    #define NUMBTN(l)   styledButton(l, COL_BTN_NUM, COL_BTN_NUM_H, COL_BTN_NUM_A, btnSize)
+    #define OPBTN(l)    styledButton(l, COL_BTN_OP, COL_BTN_OP_H, COL_BTN_OP_A, btnSize)
+    #define FUNCBTN(l)  styledButton(l, COL_BTN_FUNC, COL_BTN_FUNC_H, COL_BTN_FUNC_A, btnSize)
+    #define DELBTN(l)   styledButton(l, COL_BTN_DEL, COL_BTN_DEL_H, COL_BTN_DEL_A, btnSize)
+    #define ACBTN(l)    styledButton(l, COL_BTN_AC, COL_BTN_AC_H, COL_BTN_AC_A, btnSize)
+    #define EQBTN(l)    styledButton(l, COL_BTN_EQ, COL_BTN_EQ_H, COL_BTN_EQ_A, btnSize)
+    #define TOOLBTN(l)  styledButton(l, COL_BTN_TOOL, COL_BTN_TOOL_H, COL_BTN_TOOL_A, btnSize)
+
+    // Push larger font for buttons (Fonts[4] = 20px button font)
+    ImFont* btnFont = ImGui::GetIO().Fonts->Fonts[4];
+    ImGui::PushFont(btnFont);
+
+    // Row 0: Blue function keys — parentheses with func keys
+    if (FUNCBTN("sin##r0c0")) calcOnButton("sin"); sameLine();
+    if (FUNCBTN("cos##r0c1")) calcOnButton("cos"); sameLine();
+    if (FUNCBTN("tan##r0c2")) calcOnButton("tan"); sameLine();
+    if (FUNCBTN("(##r0c3"))   calcOnButton("(");  sameLine();
+    if (FUNCBTN(")##r0c4"))   calcOnButton(")");
 
     // Row 1: Blue function keys
-    if (funcBtn("x²##r1c0"))  calcOnButton("x²"); sameLine();
-    if (funcBtn("√##r1c1"))   calcOnButton("√");  sameLine();
-    if (funcBtn("x^y##r1c2")) calcOnButton("x^y"); sameLine();
-    if (funcBtn("π##r1c3"))   calcOnButton("π");  sameLine();
-    if (funcBtn("e##r1c4"))   calcOnButton("e");
+    if (FUNCBTN("x²##r1c0"))  calcOnButton("x²"); sameLine();
+    if (FUNCBTN("√##r1c1"))   calcOnButton("√");  sameLine();
+    if (FUNCBTN("x^y##r1c2")) calcOnButton("x^y"); sameLine();
+    if (FUNCBTN("π##r1c3"))   calcOnButton("π");  sameLine();
+    if (FUNCBTN("e##r1c4"))   calcOnButton("e");
 
     // Row 2: 7 8 9 ÷ DEL
-    if (numBtn("7##r2c0"))  calcOnButton("7"); sameLine();
-    if (numBtn("8##r2c1"))  calcOnButton("8"); sameLine();
-    if (numBtn("9##r2c2"))  calcOnButton("9"); sameLine();
-    if (opBtn("÷##r2c3"))   calcOnButton("÷"); sameLine();
-    if (delBtn("DEL##r2c4")) calcOnButton("DEL");
+    if (NUMBTN("7##r2c0"))  calcOnButton("7"); sameLine();
+    if (NUMBTN("8##r2c1"))  calcOnButton("8"); sameLine();
+    if (NUMBTN("9##r2c2"))  calcOnButton("9"); sameLine();
+    if (OPBTN("÷##r2c3"))   calcOnButton("÷"); sameLine();
+    if (DELBTN("DEL##r2c4")) calcOnButton("DEL");
 
     // Row 3: 4 5 6 × AC
-    if (numBtn("4##r3c0"))  calcOnButton("4"); sameLine();
-    if (numBtn("5##r3c1"))  calcOnButton("5"); sameLine();
-    if (numBtn("6##r3c2"))  calcOnButton("6"); sameLine();
-    if (opBtn("×##r3c3"))   calcOnButton("×"); sameLine();
-    if (acBtn("AC##r3c4"))  calcOnButton("AC");
+    if (NUMBTN("4##r3c0"))  calcOnButton("4"); sameLine();
+    if (NUMBTN("5##r3c1"))  calcOnButton("5"); sameLine();
+    if (NUMBTN("6##r3c2"))  calcOnButton("6"); sameLine();
+    if (OPBTN("×##r3c3"))   calcOnButton("×"); sameLine();
+    if (ACBTN("AC##r3c4"))  calcOnButton("AC");
 
     // Row 4: 1 2 3 + -
-    if (numBtn("1##r4c0"))  calcOnButton("1"); sameLine();
-    if (numBtn("2##r4c1"))  calcOnButton("2"); sameLine();
-    if (numBtn("3##r4c2"))  calcOnButton("3"); sameLine();
-    if (opBtn("+##r4c3"))   calcOnButton("+"); sameLine();
-    if (opBtn("-##r4c4"))   calcOnButton("-");
+    if (NUMBTN("1##r4c0"))  calcOnButton("1"); sameLine();
+    if (NUMBTN("2##r4c1"))  calcOnButton("2"); sameLine();
+    if (NUMBTN("3##r4c2"))  calcOnButton("3"); sameLine();
+    if (OPBTN("+##r4c3"))   calcOnButton("+"); sameLine();
+    if (OPBTN("-##r4c4"))   calcOnButton("-");
 
-    // Row 5: 0 . Ans log ln
-    if (numBtn("0##r5c0"))  calcOnButton("0"); sameLine();
-    if (numBtn(".##r5c1"))  calcOnButton("."); sameLine();
-    if (toolBtn("Ans##r5c2")) calcOnButton("Ans"); sameLine();
-    if (funcBtn("log##r5c3")) calcOnButton("log"); sameLine();
-    if (funcBtn("ln##r5c4"))  calcOnButton("ln");
+    // Row 5: 0 . Ans = %
+    if (NUMBTN("0##r5c0"))  calcOnButton("0"); sameLine();
+    if (NUMBTN(".##r5c1"))  calcOnButton("."); sameLine();
+    if (TOOLBTN("Ans##r5c2")) calcOnButton("Ans"); sameLine();
+    if (EQBTN("=##r5c3"))     calcOnButton("="); sameLine();
+    if (TOOLBTN("%##r5c4"))   calcOnButton("%");
 
-    // Row 6: = button spans full width, taller
-    {
-        float eqBtnW = availW; // full width
-        float eqBtnH = 54.0f;  // taller = button
-        ImGui::SetCursorScreenPos(ImVec2(
-            ImGui::GetCursorScreenPos().x,
-            ImGui::GetCursorScreenPos().y));
-        if (styledButton("=##r6c0", COL_BTN_EQ, COL_BTN_EQ_H, COL_BTN_EQ_A,
-                         ImVec2(eqBtnW, eqBtnH)))
-            calcOnButton("=");
-    }
+    // Row 6: log ln n! Rand Help
+    if (FUNCBTN("log##r6c0")) calcOnButton("log"); sameLine();
+    if (FUNCBTN("ln##r6c1"))  calcOnButton("ln"); sameLine();
+    if (TOOLBTN("n!##r6c2"))  calcOnButton("!");  sameLine();
+    if (TOOLBTN(T("Rand##r6c3", "随机##r6c3", "乱数##r6c3"))) calcOnButton("rand"); sameLine();
+    if (TOOLBTN(T("Help##r6c4", "帮助##r6c4", "ヘルプ##r6c4"))) ImGui::OpenPopup("##helpPopup");
+
+    // Cleanup macros
+    #undef NUMBTN
+    #undef OPBTN
+    #undef FUNCBTN
+    #undef DELBTN
+    #undef ACBTN
+    #undef EQBTN
+    #undef TOOLBTN
+
+    ImGui::PopFont();
 }
 
 // ============================================================
@@ -411,7 +439,7 @@ void renderTopBar() {
         case LANG_JA: langLabel = "日本語"; langCol = COL_BTN_FUNC; break;
         default:      langLabel = "EN";  langCol = COL_BTN_TOOL; break;
     }
-    if (styledButton(langLabel, langCol, COL_BTN_TOOL_H, COL_BTN_TOOL_A, ImVec2(52, 26))) {
+    if (styledButton(langLabel, langCol, COL_BTN_TOOL_H, COL_BTN_TOOL_A, ImVec2(56, 30))) {
         calcToggleLang();
     }
     if (ImGui::IsItemHovered()) {
@@ -424,7 +452,7 @@ void renderTopBar() {
 
     // Angle mode toggle
     const char* amStr = angleModeStr(g_state.angleMode);
-    if (styledButton(amStr, COL_BTN_TOOL, COL_BTN_TOOL_H, COL_BTN_TOOL_A, ImVec2(52, 26))) {
+    if (styledButton(amStr, COL_BTN_TOOL, COL_BTN_TOOL_H, COL_BTN_TOOL_A, ImVec2(56, 30))) {
         calcToggleAngleMode();
     }
     if (ImGui::IsItemHovered()) {
@@ -590,13 +618,6 @@ void renderTopBar() {
     }
 
     ImGui::SameLine(0, 8);
-
-    // Extra utilities: Rand, %, !
-    if (toolBtn(T("rand##tb", "随机##tb", "乱数##tb"))) calcOnButton("rand");
-    ImGui::SameLine(0, 4);
-    if (toolBtn("%##tb")) calcOnButton("%");
-    ImGui::SameLine(0, 4);
-    if (toolBtn("n!##tb")) calcOnButton("!");
 
     ImGui::Separator();
 }
@@ -1835,6 +1856,77 @@ void renderAdvancedModal() {
 }
 
 // ============================================================
+// Bottom Function Graph — default sin(x)/cos(x) plot
+// ============================================================
+void renderBottomGraph() {
+    float availW = ImGui::GetContentRegionAvail().x;
+    float availH = ImGui::GetContentRegionAvail().y;
+
+    // Reserve space for the graph
+    float graphH = availH;
+    if (graphH < 100.0f) graphH = 100.0f;
+    if (graphH > 210.0f) graphH = 210.0f;
+
+    ImVec2 graphPos = ImGui::GetCursorScreenPos();
+    ImVec2 graphSize = ImVec2(availW, graphH);
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+
+    // Generate sin(x) and cos(x) plot data once
+    static bool sinDataReady = false;
+    static std::vector<PlotData> sinPlots;
+    if (!sinDataReady) {
+        sinPlots.push_back(
+            PlotGenerator::generate([](double x) { return std::sin(x); },
+                                    -10, 10, 500, "sin(x)"));
+        sinPlots.push_back(
+            PlotGenerator::generate([](double x) { return std::cos(x); },
+                                    -10, 10, 500, "cos(x)"));
+        sinDataReady = true;
+    }
+
+    // Plot area with margins for labels
+    float mg = 45.0f;
+    ImVec2 plotOrigin(graphPos.x + mg, graphPos.y + 4.0f);
+    ImVec2 plotSize(graphSize.x - mg - 4.0f, graphSize.y - mg - 4.0f);
+
+    if (plotSize.x > 50 && plotSize.y > 50) {
+        double xMin = -10, xMax = 10;
+        double yMin = -1.5, yMax = 1.5;
+        // Auto-scale y axis from data
+        if (!sinPlots.empty()) {
+            yMin = std::min(sinPlots[0].y_min, sinPlots.size() > 1 ? sinPlots[1].y_min : -1.5);
+            yMax = std::max(sinPlots[0].y_max, sinPlots.size() > 1 ? sinPlots[1].y_max : 1.5);
+        }
+        double yPad = (yMax - yMin) * 0.1;
+        if (yPad < 0.01) yPad = 0.1;
+        yMin -= yPad;
+        yMax += yPad;
+
+        drawGraphBg(dl, plotOrigin, plotSize);
+        drawGrid(dl, plotOrigin, plotSize, xMin, xMax, yMin, yMax);
+        drawPlot(dl, plotOrigin, plotSize, xMin, xMax, yMin, yMax, sinPlots,
+                 {IM_COL32(80, 220, 120, 255), IM_COL32(255, 180, 80, 200)});
+        drawAxesLabels(dl, plotOrigin, plotSize, xMin, xMax, yMin, yMax);
+    }
+
+    // Legend
+    float legX = graphPos.x + mg;
+    float legY = graphPos.y + 6.0f;
+    dl->AddRectFilled(ImVec2(legX, legY), ImVec2(legX + 110, legY + 30),
+                      IM_COL32(10, 10, 18, 200), 4.0f);
+    dl->AddLine(ImVec2(legX + 4, legY + 10), ImVec2(legX + 24, legY + 10),
+                IM_COL32(80, 220, 120, 255), 2);
+    dl->AddText(ImVec2(legX + 28, legY + 3), IM_COL32(160, 220, 160, 255), "sin(x)");
+    dl->AddLine(ImVec2(legX + 4, legY + 22), ImVec2(legX + 24, legY + 22),
+                IM_COL32(255, 180, 80, 200), 2);
+    dl->AddText(ImVec2(legX + 28, legY + 15), IM_COL32(255, 200, 140, 255), "cos(x)");
+
+    // Advance cursor
+    ImGui::SetCursorScreenPos(ImVec2(graphPos.x, graphPos.y + graphSize.y + 2));
+}
+
+// ============================================================
 // Main UI Render — adaptive to window size
 // ============================================================
 void renderUI() {
@@ -1869,33 +1961,11 @@ void renderUI() {
     // Button Grid
     renderButtons();
 
-    // Extra row: constants shortcuts
+    // Bottom function graph (sin(x)/cos(x))
     ImGui::Separator();
-    float availW = ImGui::GetContentRegionAvail().x;
-    float btnW = (availW - 5 * BTN_GAP) / 6.0f;
-    ImVec2 smBtn(btnW, 32);
-    if (styledButton("π##extra0", COL_BTN_TOOL, COL_BTN_TOOL_H, COL_BTN_TOOL_A, smBtn))
-        calcOnButton("π");
-    ImGui::SameLine(0, BTN_GAP);
-    if (styledButton("e##extra1", COL_BTN_TOOL, COL_BTN_TOOL_H, COL_BTN_TOOL_A, smBtn))
-        calcOnButton("e");
-    ImGui::SameLine(0, BTN_GAP);
-    if (styledButton(T("rand##extra2", "随机##extra2", "乱数##extra2"),
-                     COL_BTN_TOOL, COL_BTN_TOOL_H, COL_BTN_TOOL_A, smBtn))
-        calcOnButton("rand");
-    ImGui::SameLine(0, BTN_GAP);
-    if (styledButton("%##extra3", COL_BTN_TOOL, COL_BTN_TOOL_H, COL_BTN_TOOL_A, smBtn))
-        calcOnButton("%");
-    ImGui::SameLine(0, BTN_GAP);
-    if (styledButton("n!##extra4", COL_BTN_TOOL, COL_BTN_TOOL_H, COL_BTN_TOOL_A, smBtn))
-        calcOnButton("!");
-    ImGui::SameLine(0, BTN_GAP);
-    if (styledButton(T("Help##extra5", "帮助##extra5", "ヘルプ##extra5"),
-                     COL_BTN_TOOL, COL_BTN_TOOL_H, COL_BTN_TOOL_A, smBtn)) {
-        ImGui::OpenPopup("##helpPopup");
-    }
+    renderBottomGraph();
 
-    // Help popup
+    // Help popup (opened from Row 6 Help button)
     if (ImGui::BeginPopup("##helpPopup")) {
         ImGui::TextUnformatted(T("Keyboard Shortcuts", "键盘快捷键", "キーボードショートカット"));
         ImGui::Separator();

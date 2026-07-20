@@ -24,6 +24,9 @@ void renderUI();
 // Render top bar
 void renderTopBar();
 
+// Render bottom function graph (sin/cos)
+void renderBottomGraph();
+
 // ============================================================
 // NEW: Individual tab renderers
 // ============================================================

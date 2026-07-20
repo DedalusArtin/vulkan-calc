@@ -59,25 +59,31 @@ int main() {
     ImFont* f2 = nullptr;
     // Font 3: Small for history/status (13px)
     ImFont* f3 = nullptr;
+    // Font 4: Button font (20px)
+    ImFont* f4 = nullptr;
 
     // Try CJK font first
     const char* cjkPath = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc";
     FILE* testFile = fopen(cjkPath, "rb");
     if (testFile) {
         fclose(testFile);
-        // Load CJK with different sizes
+        // Load CJK with different sizes - use FULL CJK range for all characters
         f1 = io.Fonts->AddFontFromFileTTF(cjkPath, 28.0f, nullptr,
-            io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
+            io.Fonts->GetGlyphRangesChineseFull());
         f2 = io.Fonts->AddFontFromFileTTF(cjkPath, 16.0f, nullptr,
-            io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
+            io.Fonts->GetGlyphRangesChineseFull());
         f3 = io.Fonts->AddFontFromFileTTF(cjkPath, 12.0f, nullptr,
-            io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
+            io.Fonts->GetGlyphRangesChineseFull());
+        // Font 4: Button font
+        f4 = io.Fonts->AddFontFromFileTTF(cjkPath, 20.0f, nullptr,
+            io.Fonts->GetGlyphRangesChineseFull());
     }
 
     // Fallback to default
     if (!f1) f1 = io.Fonts->AddFontDefault(); // will be scaled via PushFont
     if (!f2) f2 = io.Fonts->AddFontDefault();
     if (!f3) f3 = io.Fonts->AddFontDefault();
+    if (!f4) f4 = io.Fonts->AddFontDefault();
 
     // Set default to the 16px CJK or default
     io.FontDefault = f2;
