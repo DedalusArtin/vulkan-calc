@@ -192,13 +192,21 @@ struct CalcState {
 
     // ============================================================
     // 3D Surface state
-    // ============================================================
+    // 3D Surface state
     char func3D[256] = "sin(sqrt(x^2+y^2))";
     float rot3DX = 30.0f, rot3DY = -30.0f;
     float zoom3D = 1.0f;
     double range3DMin = -5.0, range3DMax = 5.0;
     bool surf3DDirty = true;
     int gridRes = 40;
+
+    // Boot animation
+    bool showBoot = true;
+    float bootTimer = 0;
+
+    // 3D surface mouse drag orbit control
+    bool surfIsDragging = false;
+    float surfDragLastX = 0, surfDragLastY = 0;
 
     // ============================================================
     // Extension API state

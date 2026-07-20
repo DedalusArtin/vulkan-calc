@@ -1829,6 +1829,43 @@ void renderAdvancedTabContent() {
                              g_state.range3DMin, g_state.range3DMax,
                              g_state.rot3DX, g_state.rot3DY, g_state.zoom3D);
             }
+
+            // ---- Mouse orbit control: invisible button over the drawing area ----
+            ImGui::SetCursorScreenPos(o);
+            ImGui::InvisibleButton("##surfDrag", sz);
+            if (ImGui::IsItemHovered()) {
+                // Mouse wheel zoom
+                float wheel = ImGui::GetIO().MouseWheel;
+                if (wheel != 0.0f) {
+                    g_state.zoom3D *= (1.0f + wheel * 0.1f);
+                    if (g_state.zoom3D < 0.1f) g_state.zoom3D = 0.1f;
+                    if (g_state.zoom3D > 5.0f) g_state.zoom3D = 5.0f;
+                    g_state.surf3DDirty = true;
+                }
+                // Left-click drag to rotate
+                if (ImGui::IsMouseDown(0)) {
+                    ImVec2 mp = ImGui::GetIO().MousePos;
+                    if (!g_state.surfIsDragging) {
+                        g_state.surfIsDragging = true;
+                        g_state.surfDragLastX = mp.x;
+                        g_state.surfDragLastY = mp.y;
+                    } else {
+                        float dx = mp.x - g_state.surfDragLastX;
+                        float dy = mp.y - g_state.surfDragLastY;
+                        if (dx != 0 || dy != 0) {
+                            g_state.rot3DY += dx * 0.3f;
+                            g_state.rot3DX += dy * 0.3f;
+                            g_state.surfDragLastX = mp.x;
+                            g_state.surfDragLastY = mp.y;
+                            g_state.surf3DDirty = true;
+                        }
+                    }
+                } else {
+                    g_state.surfIsDragging = false;
+                }
+            } else {
+                g_state.surfIsDragging = false;
+            }
         }
         ImGui::EndChild();
     }
@@ -2373,4 +2410,134 @@ void draw3DSurface(ImDrawList* dl, ImVec2 o, ImVec2 sz,
     dl->AddText(xEnd, axisCol, "x");
     dl->AddText(yEnd, axisColY, "y");
     dl->AddText(zEnd, axisColZ, "z");
+}
+
+// ============================================================
+// Boot Screen — 3D function auto-rotation + "开 始" button
+// ============================================================
+void renderBootScreen() {
+    auto& io = ImGui::GetIO();
+    float dt = io.DeltaTime;
+    if (dt > 0.1f) dt = 0.016f; // Clamp large delta on first frame
+
+    g_state.bootTimer += dt;
+
+    // Full-screen dark overlay window
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(io.DisplaySize);
+    ImGui::SetNextWindowBgAlpha(1.0f);
+    ImGui::Begin("##bootScreen", nullptr,
+                 ImGuiWindowFlags_NoTitleBar |
+                 ImGuiWindowFlags_NoResize |
+                 ImGuiWindowFlags_NoMove |
+                 ImGuiWindowFlags_NoScrollbar |
+                 ImGuiWindowFlags_NoScrollWithMouse |
+                 ImGuiWindowFlags_NoCollapse |
+                 ImGuiWindowFlags_NoBringToFrontOnFocus |
+                 ImGuiWindowFlags_NoDecoration);
+
+    auto* dl = ImGui::GetWindowDrawList();
+    ImVec2 wp = ImGui::GetWindowPos();
+    ImVec2 ws = ImGui::GetWindowSize();
+
+    // Deep dark background
+    dl->AddRectFilled(wp, ImVec2(wp.x + ws.x, wp.y + ws.y),
+                      IM_COL32(2, 2, 12, 255));
+
+    float cX = wp.x + ws.x / 2;
+    float cY = wp.y + ws.y / 2;
+
+    // ---- Title ----
+    ImFont* titleFont = io.Fonts->Fonts.Size > 1 ? io.Fonts->Fonts[1] : io.FontDefault;
+    const char* title = "VulkanCalc";
+    ImVec2 titleSz = titleFont->CalcTextSizeA(titleFont->FontSize, FLT_MAX, 0, title);
+    float titleY = wp.y + 40;
+    dl->AddText(titleFont, titleFont->FontSize,
+                ImVec2(cX - titleSz.x / 2, titleY),
+                IM_COL32(100, 180, 255, 255), title);
+
+    // Subtitle
+    ImFont* subFont = io.FontDefault;
+    const char* subtitle = "3D 科学计算器";
+    ImVec2 subSz = subFont->CalcTextSizeA(subFont->FontSize, FLT_MAX, 0, subtitle);
+    dl->AddText(subFont, subFont->FontSize,
+                ImVec2(cX - subSz.x / 2, titleY + titleSz.y + 6),
+                IM_COL32(150, 200, 255, 160), subtitle);
+
+    // ---- 3D surface with auto-rotation ----
+    float rotX = 20.0f + 15.0f * std::sin(g_state.bootTimer * 0.7f);
+    float rotY = g_state.bootTimer * 30.0f; // continuous rotation
+
+    // Surface drawing area
+    float surfW = ws.x * 0.72f;
+    float surfH = ws.y * 0.45f;
+    float surfX = wp.x + (ws.x - surfW) / 2;
+    float surfY = titleY + titleSz.y + 50;
+
+    if (surfW > 50 && surfH > 50) {
+        draw3DSurface(dl, ImVec2(surfX, surfY), ImVec2(surfW, surfH),
+                      "sin(sqrt(x^2+y^2))",
+                      -5.0, 5.0, rotX, rotY, 1.2f);
+    }
+
+    // ---- "开 始" button ----
+    float btnAppear = 2.5f;
+    if (g_state.bootTimer > btnAppear) {
+        float bt = g_state.bootTimer - btnAppear;
+        // Breathing: opacity + size pulse
+        float breathe = (std::sin(bt * 2.0f) + 1.0f) * 0.5f; // 0..1
+        float alpha  = 0.45f + 0.55f * breathe;
+        float scalePulse = 1.0f + 0.04f * breathe;
+
+        float btnW = 200.0f * scalePulse;
+        float btnH = 56.0f  * scalePulse;
+        float btnY = surfY + surfH + 40;
+        ImVec2 btnMin(cX - btnW / 2, btnY);
+        ImVec2 btnMax(cX + btnW / 2, btnY + btnH);
+
+        // Glow behind button
+        float glowR = 30.0f + 12.0f * breathe;
+        dl->AddCircleFilled(ImVec2(cX, btnY + btnH / 2),
+                            btnW / 2 + glowR,
+                            IM_COL32(60, 150, 255, (int)(20 * alpha)), 40);
+
+        // Button body
+        ImU32 btnBg     = IM_COL32(50, 120, 255, (int)(200 * alpha));
+        ImU32 btnBorder = IM_COL32(80, 180, 255, (int)(220 * alpha));
+        dl->AddRectFilled(btnMin, btnMax, btnBg, 14.0f);
+        dl->AddRect(btnMin, btnMax, btnBorder, 14.0f, 0, 2.0f);
+
+        // "开  始" text
+        const char* btnText = "开  始";
+        // Use a medium-large font (Fonts[4]=20px or fallback)
+        ImFont* btnFont = io.FontDefault;
+        if (io.Fonts->Fonts.Size > 4) btnFont = io.Fonts->Fonts[4];
+        else if (io.Fonts->Fonts.Size > 1) btnFont = io.Fonts->Fonts[1];
+        ImVec2 txtSz = btnFont->CalcTextSizeA(btnFont->FontSize, FLT_MAX, 0, btnText);
+        dl->AddText(btnFont, btnFont->FontSize,
+                    ImVec2(cX - txtSz.x / 2, btnY + (btnH - txtSz.y) / 2),
+                    IM_COL32(255, 255, 255, (int)(255 * alpha)), btnText);
+
+        // Hover & click detection
+        ImVec2 mouse = io.MousePos;
+        bool hovered = (mouse.x >= btnMin.x && mouse.x <= btnMax.x &&
+                        mouse.y >= btnMin.y && mouse.y <= btnMax.y);
+        if (hovered) {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            dl->AddRectFilled(btnMin, btnMax,
+                              IM_COL32(255, 255, 255, 15), 14.0f);
+        }
+        if (ImGui::IsMouseClicked(0) && hovered) {
+            g_state.showBoot = false;
+        }
+    }
+
+    // Dismiss on Enter/Space (any time)
+    if (ImGui::IsKeyPressed(ImGuiKey_Enter) ||
+        ImGui::IsKeyPressed(ImGuiKey_KeypadEnter) ||
+        ImGui::IsKeyPressed(ImGuiKey_Space)) {
+        g_state.showBoot = false;
+    }
+
+    ImGui::End();
 }

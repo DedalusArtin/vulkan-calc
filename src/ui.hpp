@@ -68,3 +68,6 @@ void draw3DSurface(ImDrawList* dl, ImVec2 o, ImVec2 sz,
                    double xMin, double xMax,
                    double rotX, double rotY,
                    float zoom);
+
+// Boot screen animation
+void renderBootScreen();

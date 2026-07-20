@@ -175,6 +175,11 @@ void calcEvaluate() {
             // Format result
             std::ostringstream oss;
             oss << std::setprecision(12);
+            // Near-zero rounding: if result is extremely close to 0, display as 0
+            // This handles sin(pi) → 1.224e-16 → 0
+            if (std::abs(val) < 1e-12) {
+                val = 0.0;
+            }
             // Remove trailing zeros
             oss << val;
             std::string resStr = oss.str();

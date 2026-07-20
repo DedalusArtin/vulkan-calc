@@ -204,8 +204,12 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // Render the calculator UI
-        renderUI();
+        // Render the calculator UI (or boot screen)
+        if (g_state.showBoot) {
+            renderBootScreen();
+        } else {
+            renderUI();
+        }
 
         // --- Vulkan render ---
         ImGui::Render();
