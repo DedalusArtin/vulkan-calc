@@ -62,6 +62,7 @@ int main() {
     rangeBuilder.AddChar(U'\u2260'); // ≠ not equal
     rangeBuilder.AddChar(U'\u2264'); // ≤
     rangeBuilder.AddChar(U'\u2265'); // ≥
+    rangeBuilder.AddChar(U'\u20AC'); // € Euro
     ImVector<ImWchar> fullRanges;
     rangeBuilder.BuildRanges(&fullRanges);
 

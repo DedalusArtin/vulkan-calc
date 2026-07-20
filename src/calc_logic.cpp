@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <functional>
 #include <ctime>
+#include <fstream>
 
 // Apply angle mode to trig function calls in expression
 std::string applyAngleMode(const std::string& expr, AngleMode mode) {
@@ -1262,6 +1263,11 @@ void initExtensions() {
         "100C",
         "temp"
     });
+
+    // Load cached exchange rates if available
+    if (g_state.exchangeRates.empty()) {
+        loadExchangeRatesCache();
+    }
 }
 
 // ============================================================
@@ -1301,6 +1307,15 @@ bool fetchExchangeRates() {
 
     if (json.empty()) {
         if (g_state.exchangeRates.empty()) {
+            // Try to load from cache file
+            if (loadExchangeRatesCache()) {
+                g_state.exchangeRateInfo += T(
+                    " (offline, using cache)",
+                    " (网络不可用，使用缓存数据)",
+                    " (オフライン、キャッシュ使用)"
+                );
+                return true; // Cache loaded successfully
+            }
             g_state.exchangeRateInfo = T(
                 "Network unavailable - cannot fetch rates",
                 "网络不可用 - 无法获取汇率",
@@ -1385,6 +1400,124 @@ bool fetchExchangeRates() {
     g_state.exchangeRateInfo = T(
         "Rates updated at: ", "汇率更新时间: ", "レート更新時刻: "
     );
+    g_state.exchangeRateInfo += timeBuf;
+
+    // Save to cache file
+    saveExchangeRatesCache();
+
+    return true;
+}
+
+// Save exchange rates to cache file
+bool saveExchangeRatesCache() {
+    // Ensure ~/.codex directory exists
+    system("mkdir -p ~/.codex 2>/dev/null");
+
+    std::string cachePath = std::string(getenv("HOME")) + "/.codex/exchange_rates.json";
+
+    std::ofstream ofs(cachePath);
+    if (!ofs.is_open()) return false;
+
+    ofs << "{\n";
+    ofs << "  \"timestamp\": " << g_state.exchangeRateTime << ",\n";
+    ofs << "  \"rates\": {\n";
+    bool first = true;
+    for (auto& [code, rate] : g_state.exchangeRates) {
+        if (!first) ofs << ",\n";
+        first = false;
+        ofs << "    \"" << code << "\": " << rate;
+    }
+    ofs << "\n  }\n";
+    ofs << "}\n";
+    ofs.close();
+    return true;
+}
+
+// Load exchange rates from cache file
+bool loadExchangeRatesCache() {
+    std::string cachePath = std::string(getenv("HOME")) + "/.codex/exchange_rates.json";
+
+    std::ifstream ifs(cachePath);
+    if (!ifs.is_open()) return false;
+
+    std::string json((std::istreambuf_iterator<char>(ifs)),
+                      std::istreambuf_iterator<char>());
+    ifs.close();
+
+    if (json.empty()) return false;
+
+    // Parse timestamp
+    auto tsPos = json.find("\"timestamp\"");
+    if (tsPos != std::string::npos) {
+        auto colonPos = json.find(':', tsPos);
+        if (colonPos != std::string::npos) {
+            char* end = nullptr;
+            double ts = std::strtod(json.c_str() + colonPos + 1, &end);
+            if (end != json.c_str() + colonPos + 1) {
+                g_state.exchangeRateTime = (time_t)ts;
+            }
+        }
+    }
+
+    // Parse rates block
+    auto ratesPos = json.find("\"rates\"");
+    if (ratesPos == std::string::npos) return false;
+
+    auto bracePos = json.find('{', ratesPos);
+    if (bracePos == std::string::npos) return false;
+
+    g_state.exchangeRates.clear();
+
+    size_t pos = bracePos + 1;
+    while (pos < json.size()) {
+        while (pos < json.size() && (json[pos] == ' ' || json[pos] == ',' ||
+               json[pos] == '\n' || json[pos] == '\r' || json[pos] == '\t'))
+            pos++;
+        if (pos >= json.size() || json[pos] == '}') break;
+
+        if (json[pos] != '"') { pos++; continue; }
+        pos++;
+        size_t codeStart = pos;
+        while (pos < json.size() && json[pos] != '"') pos++;
+        if (pos >= json.size()) break;
+        std::string code = json.substr(codeStart, pos - codeStart);
+        pos++;
+
+        while (pos < json.size() && (json[pos] == ' ' || json[pos] == ':')) pos++;
+
+        char* end = nullptr;
+        double rate = std::strtod(json.c_str() + pos, &end);
+        if (end != json.c_str() + pos) {
+            g_state.exchangeRates[code] = rate;
+            pos = end - json.c_str();
+        } else {
+            pos++;
+        }
+    }
+
+    if (g_state.exchangeRates.empty()) return false;
+
+    // Check if cache is older than 24 hours
+    time_t now = time(nullptr);
+    double hoursOld = difftime(now, g_state.exchangeRateTime) / 3600.0;
+
+    char timeBuf[64];
+    struct tm* t = localtime(&g_state.exchangeRateTime);
+    strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%d %H:%M:%S", t);
+
+    if (hoursOld > 24.0) {
+        g_state.exchangeRateInfo = T(
+            "Cached rates (over 24h old) from: ",
+            "缓存汇率(超过24小时) 时间: ",
+            "キャッシュ(24時間以上前) 時刻: "
+        );
+    } else {
+        g_state.exchangeRateInfo = T(
+            "Cached rates from: ",
+            "缓存汇率 时间: ",
+            "キャッシュ 時刻: "
+        );
+    }
     g_state.exchangeRateInfo += timeBuf;
 
     return true;

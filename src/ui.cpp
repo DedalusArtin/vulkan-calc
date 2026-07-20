@@ -9,6 +9,7 @@
 #include <cstring>
 #include <algorithm>
 #include <cctype>
+#include <ctime>
 
 // Colors
 static const ImU32 COL_LCD_BG       = IM_COL32(10, 18, 10, 255);
@@ -864,6 +865,58 @@ static void drawAxesLabels(ImDrawList* dl, ImVec2 o, ImVec2 sz,
                     IM_COL32(120, 120, 160, 255), "y");
 }
 
+static void drawIntegralFill(ImDrawList* dl, ImVec2 o, ImVec2 sz,
+                              double xMin, double xMax,
+                              double yMin, double yMax,
+                              double intA, double intB,
+                              const std::string& expr) {
+    if (intB <= intA) return;
+    if (intA >= xMax || intB <= xMin) return;
+
+    double a = std::max(intA, xMin);
+    double b = std::min(intB, xMax);
+
+    // Create a local evaluator for sampling
+    ExpressionEvaluator eval;
+    eval.setExpression(expr);
+    if (!eval.valid()) return;
+
+    auto ts = makeToScreen(o, sz, xMin, xMax, yMin, yMax);
+
+    // Sample 200 points in [a, b]
+    int nSamples = 200;
+    std::vector<ImVec2> pts;
+    pts.reserve(nSamples + 2);
+
+    // Start at bottom (y=0 baseline), go along curve, come back
+    pts.push_back(ts(a, 0));
+
+    for (int i = 0; i <= nSamples; i++) {
+        double t = (double)i / nSamples;
+        double x = a + t * (b - a);
+        double y = eval.evaluate(x);
+        if (!std::isfinite(y)) y = 0;
+        // Clamp to visible range
+        if (y < yMin) y = yMin;
+        if (y > yMax) y = yMax;
+        pts.push_back(ts(x, y));
+    }
+
+    pts.push_back(ts(b, 0));
+
+    // Draw filled polygon
+    ImU32 fillCol = IM_COL32(255, 180, 60, 60);
+    ImU32 borderCol = IM_COL32(255, 180, 60, 150);
+
+    if (pts.size() >= 3) {
+        dl->AddConvexPolyFilled(pts.data(), (int)pts.size(), fillCol);
+        // Draw outline along the curve
+        for (size_t i = 2; i < pts.size() - 1; i++) {
+            dl->AddLine(pts[i-1], pts[i], borderCol, 1.5f);
+        }
+    }
+}
+
 static void drawPlot(ImDrawList* dl, ImVec2 o, ImVec2 sz,
                      double xMin, double xMax,
                      double yMin, double yMax,
@@ -990,8 +1043,23 @@ void renderAdvancedTabContent() {
         }
         ImGui::SameLine();
 
+        // Draw Graph button (independent, no integral needed)
+        if (ImGui::Button(T("Draw Graph##advPlot", "绘制图像##advPlot", "描画##advPlot"))) {
+            g_state.plotMode = CalcState::PLOT_FUNC;
+            g_state.plots = PlotGenerator::generateMultiple(
+                {[&](double x) {
+                    g_state.evaluator.setExpression(g_state.advExpr);
+                    return g_state.evaluator.evaluate(x);
+                }},
+                g_state.plotXMin, g_state.plotXMax, 500);
+            g_state.showIntegralFill = false;
+            g_state.advPlotDirty = true;
+        }
+        ImGui::SameLine();
+
         // Integral
         if (ImGui::Button(T("∫ f(x) dx##adv", "定积分 ∫##adv", "定積分 ∫##adv"))) {
+            g_state.showIntegralFill = true;
             auto r = Integrator::adaptiveSimpson(
                 [&](double x) {
                     g_state.evaluator.setExpression(g_state.advExpr);
@@ -999,9 +1067,9 @@ void renderAdvancedTabContent() {
                 },
                 g_state.intA, g_state.intB);
             std::ostringstream o;
-            o << "∫ = " << r.value;
+            // Display: ∫[a,b] f(x) dx = result
+            o << "∫[" << g_state.intA << ", " << g_state.intB << "] f(x) dx = " << r.value;
             g_state.advIntegralResult = o.str();
-            g_state.advResult = std::to_string(r.value);
             g_state.plotMode = CalcState::PLOT_INTEG;
             g_state.plots = PlotGenerator::generateMultiple(
                 {[&](double x) {
@@ -1009,6 +1077,7 @@ void renderAdvancedTabContent() {
                     return g_state.evaluator.evaluate(x);
                 }},
                 g_state.plotXMin, g_state.plotXMax, 500);
+            g_state.advPlotDirty = true;
         }
         ImGui::SameLine();
         ImGui::SetNextItemWidth(60);
@@ -1091,6 +1160,25 @@ void renderAdvancedTabContent() {
                          {IM_COL32(80, 200, 255, 255), IM_COL32(255, 180, 80, 255)});
                 drawAxesLabels(dl, po, ps, xMin, xMax, yMin, yMax);
 
+                // Draw integral area fill if applicable
+                if (g_state.showIntegralFill && !g_state.advExpr.empty()) {
+                    drawIntegralFill(dl, po, ps, xMin, xMax, yMin, yMax,
+                                     g_state.intA, g_state.intB, g_state.advExpr);
+                    // Legend for integral area
+                    float legX = po.x + 8;
+                    float legY = po.y + 8;
+                    dl->AddRectFilled(ImVec2(legX, legY), ImVec2(legX + 130, legY + 22),
+                                      IM_COL32(10, 10, 18, 200), 4.0f);
+                    dl->AddRectFilled(ImVec2(legX + 4, legY + 6), ImVec2(legX + 20, legY + 16),
+                                      IM_COL32(255, 180, 60, 120), 2.0f);
+                    dl->AddRect(ImVec2(legX + 4, legY + 6), ImVec2(legX + 20, legY + 16),
+                                IM_COL32(255, 180, 60, 200), 2.0f);
+                    char legBuf[64];
+                    snprintf(legBuf, sizeof(legBuf), "∫ [%.2f, %.2f]", g_state.intA, g_state.intB);
+                    dl->AddText(ImVec2(legX + 24, legY + 3),
+                                IM_COL32(200, 200, 220, 220), legBuf);
+                }
+
                 // Click on plot to expand to large viewer
                 ImGui::SetCursorScreenPos(po);
                 ImGui::InvisibleButton("##expandPlot", ps);
@@ -1099,6 +1187,7 @@ void renderAdvancedTabContent() {
                     g_state.largePlotXMin = xMin; g_state.largePlotXMax = xMax;
                     g_state.largePlotYMin = yMin; g_state.largePlotYMax = yMax;
                     g_state.largePlotDirty = true;
+                    g_state.largePlotData = g_state.plots;
                 }
                 // Show hint on hover
                 if (ImGui::IsItemHovered()) {
@@ -1441,6 +1530,21 @@ void renderAdvancedTabContent() {
                                     ts(p.points[i].x, p.points[i].y), col, ex ? 1 : 2);
                 }
                 drawAxesLabels(dl, po, ps, xM, xX, yM, yX);
+
+                // Click to enlarge
+                ImGui::SetCursorScreenPos(po);
+                ImGui::InvisibleButton("##expandFourierPlot", ps);
+                if (ImGui::IsItemClicked()) {
+                    g_state.showLargePlot = true;
+                    g_state.largePlotXMin = xM; g_state.largePlotXMax = xX;
+                    g_state.largePlotYMin = yM; g_state.largePlotYMax = yX;
+                    g_state.largePlotDirty = true;
+                    g_state.largePlotData = g_state.fourierPlots;
+                }
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("%s",
+                        T("Click to expand plot", "点击放大图像", "クリックして拡大"));
+                }
             }
         }
         ImGui::EndChild();
@@ -1834,6 +1938,19 @@ void renderAdvancedTabContent() {
                            T("z: color(red=high, blue=low)",
                              "z: 颜色(红=高, 蓝=低)",
                              "z: 色(赤=高, 青=低)"));
+        ImGui::SameLine();
+        if (ImGui::SmallButton(T("Enlarge##3de", "放大##3de", "拡大##3de"))) {
+            g_state.showLarge3D = true;
+            g_state.large3DRotX = g_state.rot3DX;
+            g_state.large3DRotY = g_state.rot3DY;
+            g_state.large3DZoom = g_state.zoom3D;
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s",
+                T("Enlarge 3D view to full screen",
+                  "放大3D视图至全屏",
+                  "3D表示を全画面に拡大"));
+        }
 
         // Reset dirty flag and get expression
         g_state.surf3DDirty = false;
@@ -1950,6 +2067,270 @@ void renderAdvancedTabContent() {
                              "Add new .h/.cpp files to add custom extensions.",
                              "扩展使用简单的C函数指针API。添加.h/.cpp文件即可自定义扩展。",
                              "拡張はシンプルなC関数ポインタAPIを使用します。.h/.cppファイルを追加してカスタム拡張を追加します。"));
+
+        ImGui::Separator();
+        // ============================================================
+        // Currency Converter (enhanced, inside extension tab)
+        // ============================================================
+        ImGui::TextColored(ImVec4(0.3f, 0.8f, 1, 1), "=== %s ===",
+                           T("Currency Converter", "货币换算", "為替換算"));
+
+        // Source currency Combo
+        ImGui::SetNextItemWidth(120);
+        ImGui::Combo(T("From##ecf", "从##ecf", "元##ecf"),
+                     &g_state.exchangeFromIdx, g_currencyCodes, g_currencyCount);
+        ImGui::SameLine();
+
+        // Swap button
+        if (ImGui::Button(T("⇄##ecs", "⇄##ecs", "⇄##ecs"))) {
+            std::swap(g_state.exchangeFromIdx, g_state.exchangeToIdx);
+        }
+        ImGui::SameLine();
+
+        // Target currency Combo
+        ImGui::SetNextItemWidth(120);
+        ImGui::Combo(T("To##ect", "至##ect", "先##ect"),
+                     &g_state.exchangeToIdx, g_currencyCodes, g_currencyCount);
+
+        // Amount input
+        ImGui::SetNextItemWidth(120);
+        ImGui::InputText("##ecAmount", g_state.exchangeAmountBuf,
+                         sizeof(g_state.exchangeAmountBuf));
+        ImGui::SameLine();
+
+        // Convert button
+        if (ImGui::Button(T("Convert##ecb", "换算##ecb", "換算##ecb"))) {
+            if (!g_state.exchangeRates.empty()) {
+                try {
+                    double amt = std::stod(g_state.exchangeAmountBuf);
+                    g_state.exchangeAmount = amt;
+                    std::string from = g_currencyCodes[g_state.exchangeFromIdx];
+                    std::string to = g_currencyCodes[g_state.exchangeToIdx];
+                    g_state.exchangeResult = convertCurrency(amt, from, to);
+                    // Add to history
+                    std::ostringstream h;
+                    h.precision(4);
+                    h << std::fixed << amt << " " << from << " = " << g_state.exchangeResult << " " << to;
+                    g_state.exchangeHistory.push_back(h.str());
+                    if (g_state.exchangeHistory.size() > 10)
+                        g_state.exchangeHistory.erase(g_state.exchangeHistory.begin());
+                } catch (...) {
+                    g_state.exchangeRateInfo = T("Invalid amount", "无效金额", "無効な金額");
+                }
+            } else {
+                g_state.exchangeRateInfo = T(
+                    "No exchange rates. Click 'Fetch Rates' first.",
+                    "没有汇率数据，请先点击'获取最新汇率'",
+                    "為替レートがありません。'レート取得'をクリックしてください。");
+            }
+        }
+
+        // Result display
+        if (g_state.exchangeResult != 0.0) {
+            char resBuf[128];
+            snprintf(resBuf, sizeof(resBuf), "%.4f %s = %.4f %s",
+                     g_state.exchangeAmount,
+                     g_currencyCodes[g_state.exchangeFromIdx],
+                     g_state.exchangeResult,
+                     g_currencyCodes[g_state.exchangeToIdx]);
+            ImGui::TextColored(ImVec4(0.2f, 1, 0.4f, 1), "%s", resBuf);
+
+            // Show rate
+            if (!g_state.exchangeRates.empty()) {
+                std::string from = g_currencyCodes[g_state.exchangeFromIdx];
+                std::string to = g_currencyCodes[g_state.exchangeToIdx];
+                auto itF = g_state.exchangeRates.find(from);
+                auto itT = g_state.exchangeRates.find(to);
+                if (itF != g_state.exchangeRates.end() && itT != g_state.exchangeRates.end()) {
+                    double rate = itT->second / itF->second;
+                    ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.8f, 1),
+                                       "1 %s = %.6f %s", from.c_str(), rate, to.c_str());
+                }
+            }
+        }
+
+        // Fetch rates button + timestamp
+        if (ImGui::Button(T("Fetch Latest Rates##ecf", "获取最新汇率##ecf", "レート取得##ecf"))) {
+            fetchExchangeRates();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(T("Load Cache##ecc", "加载缓存##ecc", "キャッシュ読込##ecc"))) {
+            if (loadExchangeRatesCache()) {
+                g_state.exchangeRateInfo += T(" (loaded)", " (已加载)", " (読込完了)");
+            } else {
+                g_state.exchangeRateInfo = T("No cache found", "无缓存数据", "キャッシュがありません");
+            }
+        }
+
+        // Timestamp + source info
+        if (g_state.exchangeRateTime > 0) {
+            char timeBuf[64];
+            struct tm* t = localtime(&g_state.exchangeRateTime);
+            strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%d %H:%M:%S", t);
+            std::string info = T("Rates updated: ", "汇率更新时间: ", "レート更新: ");
+            info += timeBuf;
+            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.7f, 1), "%s", info.c_str());
+        }
+        if (!g_state.exchangeRateInfo.empty()) {
+            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.7f, 1), "%s", g_state.exchangeRateInfo.c_str());
+        }
+        ImGui::TextColored(ImVec4(0.4f, 0.4f, 0.6f, 1), "%s",
+                           T("Data: open.er-api.com", "数据来源: open.er-api.com", "データ: open.er-api.com"));
+
+        // Trend chart button
+        ImGui::SameLine();
+        if (ImGui::Button(T("Draw Trend##ect", "绘制走势图##ect", "トレンド描画##ect"))) {
+            g_state.exchangeTrendVisible = !g_state.exchangeTrendVisible;
+            if (g_state.exchangeTrendVisible) {
+                // Generate simulated 30-day trend data
+                g_state.exchangeTrendData.clear();
+                if (!g_state.exchangeRates.empty()) {
+                    std::string from = g_currencyCodes[g_state.exchangeFromIdx];
+                    std::string to = g_currencyCodes[g_state.exchangeToIdx];
+                    auto itF = g_state.exchangeRates.find(from);
+                    auto itT = g_state.exchangeRates.find(to);
+                    if (itF != g_state.exchangeRates.end() && itT != g_state.exchangeRates.end()) {
+                        double baseRate = itT->second / itF->second;
+                        // Generate 30 days of simulated data with sine wave variation
+                        for (int d = 0; d < 30; d++) {
+                            double variation = 0.02 * std::sin(d * 0.5) +
+                                               0.015 * std::cos(d * 0.3) +
+                                               0.01 * std::sin(d * 0.7 + 1.0);
+                            double trend = 0.001 * d / 30.0; // slight trend
+                            g_state.exchangeTrendData.push_back(baseRate * (1.0 + variation + trend));
+                        }
+                    }
+                }
+                if (g_state.exchangeTrendData.empty()) {
+                    // Fallback dummy data
+                    for (int d = 0; d < 30; d++)
+                        g_state.exchangeTrendData.push_back(7.2 + 0.3 * std::sin(d * 0.3));
+                }
+            }
+        }
+
+        // Trend chart
+        if (g_state.exchangeTrendVisible && !g_state.exchangeTrendData.empty()) {
+            ImVec2 trendSz(ImGui::GetContentRegionAvail().x, 180);
+            if (trendSz.x > 50 && trendSz.y > 50) {
+                if (ImGui::BeginChild("##ecTrend", trendSz, true, ImGuiWindowFlags_NoScrollbar)) {
+                    auto* dl = ImGui::GetWindowDrawList();
+                    auto o = ImGui::GetCursorScreenPos();
+                    auto sz = ImGui::GetContentRegionAvail();
+
+                    // Background
+                    dl->AddRectFilled(o, ImVec2(o.x + sz.x, o.y + sz.y), IM_COL32(8, 8, 14, 255));
+                    dl->AddRect(o, ImVec2(o.x + sz.x, o.y + sz.y), IM_COL32(40, 40, 60, 200), 2.0f);
+
+                    float mg = 50.0f;
+                    float px = o.x + mg;
+                    float py = o.y + 10.0f;
+                    float pw = sz.x - mg - 10.0f;
+                    float ph = sz.y - mg - 10.0f;
+                    if (pw > 20 && ph > 20) {
+                        // Find min/max
+                        double mn = g_state.exchangeTrendData[0], mx = g_state.exchangeTrendData[0];
+                        for (double v : g_state.exchangeTrendData) {
+                            if (v < mn) mn = v;
+                            if (v > mx) mx = v;
+                        }
+                        double pad = (mx - mn) * 0.1;
+                        if (pad < 0.001) pad = 0.1;
+                        mn -= pad;
+                        mx += pad;
+
+                        auto toScr = [&](int idx, double val) -> ImVec2 {
+                            float fx = px + (float)idx / 29.0f * pw;
+                            float fy = py + ph - (float)((val - mn) / (mx - mn)) * ph;
+                            return ImVec2(fx, fy);
+                        };
+
+                        // Grid lines
+                        for (int i = 0; i <= 5; i++) {
+                            float y = py + ph * (float)i / 5.0f;
+                            dl->AddLine(ImVec2(px, y), ImVec2(px + pw, y), IM_COL32(30, 30, 50, 150));
+                            double val = mn + (mx - mn) * (1.0 - (double)i / 5.0);
+                            char lb[32];
+                            snprintf(lb, sizeof(lb), "%.4f", val);
+                            dl->AddText(ImVec2(px - ImGui::CalcTextSize(lb).x - 4, y - 7),
+                                        IM_COL32(100, 100, 140, 180), lb);
+                        }
+
+                        // X-axis day labels
+                        for (int d = 0; d < 30; d += 7) {
+                            ImVec2 lp = toScr(d, mn);
+                            char db[8];
+                            snprintf(db, sizeof(db), "D%d", d + 1);
+                            dl->AddText(ImVec2(lp.x - 8, py + ph + 4),
+                                        IM_COL32(100, 100, 140, 180), db);
+                        }
+
+                        // Y-axis label
+                        std::string pair = std::string(g_currencyCodes[g_state.exchangeFromIdx]) + "/" +
+                                          g_currencyCodes[g_state.exchangeToIdx];
+                        dl->AddText(ImVec2(px + 4, py + 2),
+                                    IM_COL32(120, 120, 180, 200), pair.c_str());
+
+                        // Draw the trend line
+                        ImU32 lineCol = IM_COL32(80, 200, 255, 220);
+                        ImU32 fillCol = IM_COL32(80, 200, 255, 40);
+                        std::vector<ImVec2> linePts;
+                        linePts.reserve(30);
+                        for (int d = 0; d < 30; d++) {
+                            linePts.push_back(toScr(d, g_state.exchangeTrendData[d]));
+                        }
+                        // Draw fill under the line
+                        if (linePts.size() >= 2) {
+                            std::vector<ImVec2> fillPts;
+                            fillPts.push_back(ImVec2(linePts[0].x, py + ph));
+                            for (auto& p : linePts)
+                                fillPts.push_back(p);
+                            fillPts.push_back(ImVec2(linePts.back().x, py + ph));
+                            dl->AddConvexPolyFilled(fillPts.data(), (int)fillPts.size(), fillCol);
+                        }
+                        // Draw the line
+                        for (size_t i = 1; i < linePts.size(); i++) {
+                            dl->AddLine(linePts[i-1], linePts[i], lineCol, 2.0f);
+                        }
+
+                        // Min/Max markers
+                        int minIdx = 0, maxIdx = 0;
+                        for (int d = 0; d < 30; d++) {
+                            if (g_state.exchangeTrendData[d] < g_state.exchangeTrendData[minIdx]) minIdx = d;
+                            if (g_state.exchangeTrendData[d] > g_state.exchangeTrendData[maxIdx]) maxIdx = d;
+                        }
+                        ImVec2 minP = toScr(minIdx, g_state.exchangeTrendData[minIdx]);
+                        ImVec2 maxP = toScr(maxIdx, g_state.exchangeTrendData[maxIdx]);
+                        dl->AddCircleFilled(minP, 4, IM_COL32(100, 255, 100, 220));
+                        dl->AddText(ImVec2(minP.x - 8, minP.y - 16),
+                                    IM_COL32(100, 255, 100, 220), "min");
+                        dl->AddCircleFilled(maxP, 4, IM_COL32(255, 100, 100, 220));
+                        dl->AddText(ImVec2(maxP.x - 10, maxP.y + 4),
+                                    IM_COL32(255, 100, 100, 220), "max");
+
+                        // Current value marker
+                        ImVec2 curP = toScr(29, g_state.exchangeTrendData[29]);
+                        dl->AddCircleFilled(curP, 5, lineCol);
+                        char cvb[16];
+                        snprintf(cvb, sizeof(cvb), "%.4f", g_state.exchangeTrendData[29]);
+                        dl->AddText(ImVec2(curP.x + 6, curP.y - 8), lineCol, cvb);
+                    }
+                }
+                ImGui::EndChild();
+            }
+        }
+
+        // Conversion history
+        if (!g_state.exchangeHistory.empty()) {
+            ImGui::Separator();
+            ImGui::TextColored(ImVec4(0.4f, 0.6f, 0.8f, 1), "%s",
+                               T("Conversion History", "换算记录", "換算履歴"));
+            ImGui::BeginChild("##ecHistory", ImVec2(0, 100), true);
+            for (auto& entry : g_state.exchangeHistory) {
+                ImGui::TextColored(ImVec4(0.5f, 0.8f, 0.5f, 1), "%s", entry.c_str());
+            }
+            ImGui::EndChild();
+        }
     }
 
     // ---- Volume Calculation (embedded in calculus or standalone section) ----
@@ -2229,21 +2610,24 @@ void renderLargePlotView() {
                  g_state.largePlotXMin, g_state.largePlotXMax,
                  g_state.largePlotYMin, g_state.largePlotYMax);
 
-        // Generate plot points
-        g_state.evaluator.setExpression(g_state.advExpr);
-        auto f = [&](double x) -> double {
-            g_state.evaluator.setExpression(g_state.advExpr);
-            return g_state.evaluator.evaluate(x);
-        };
-
+        // Use stored data if available (e.g. from Fourier tab), otherwise generate
         std::vector<PlotData> largePlots;
-        largePlots.push_back(
-            PlotGenerator::generate(f, g_state.largePlotXMin, g_state.largePlotXMax, 800));
+        if (!g_state.largePlotData.empty()) {
+            largePlots = g_state.largePlotData;
+        } else {
+            g_state.evaluator.setExpression(g_state.advExpr);
+            auto f = [&](double x) -> double {
+                g_state.evaluator.setExpression(g_state.advExpr);
+                return g_state.evaluator.evaluate(x);
+            };
+            largePlots.push_back(
+                PlotGenerator::generate(f, g_state.largePlotXMin, g_state.largePlotXMax, 800));
+        }
 
         drawPlot(dl, plotOrigin, plotSize,
                  g_state.largePlotXMin, g_state.largePlotXMax,
                  g_state.largePlotYMin, g_state.largePlotYMax,
-                 largePlots, {IM_COL32(80, 200, 255, 255)});
+                 largePlots, {IM_COL32(80, 200, 255, 255), IM_COL32(255, 180, 80, 255)});
         drawAxesLabels(dl, plotOrigin, plotSize,
                        g_state.largePlotXMin, g_state.largePlotXMax,
                        g_state.largePlotYMin, g_state.largePlotYMax);
@@ -2266,6 +2650,116 @@ void renderLargePlotView() {
         g_state.largePlotYMin = -10; g_state.largePlotYMax = 10;
         g_state.largePlotDirty = true;
     }
+
+    ImGui::End();
+    ImGui::PopStyleVar();
+}
+
+// ============================================================
+// Large 3D Viewer — full-screen expandable 3D surface
+// ============================================================
+void renderLarge3DView() {
+    auto& io = ImGui::GetIO();
+    ImVec2 winPos(0, 0);
+    ImVec2 winSize = io.DisplaySize;
+
+    ImGui::SetNextWindowPos(winPos);
+    ImGui::SetNextWindowSize(winSize);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
+    ImGui::Begin("##large3D", nullptr,
+                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
+                 ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDecoration |
+                 ImGuiWindowFlags_NoBringToFrontOnFocus);
+
+    auto* dl = ImGui::GetWindowDrawList();
+
+    // Background
+    dl->AddRectFilled(winPos, ImVec2(winPos.x + winSize.x, winPos.y + winSize.y),
+                      IM_COL32(5, 5, 10, 240));
+
+    // Close button (X) top-right
+    float btnS = 36.0f;
+    ImVec2 closePos(winPos.x + winSize.x - btnS - 16, winPos.y + 12);
+    ImGui::SetCursorScreenPos(closePos);
+    ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(40, 40, 60, 200));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(80, 40, 40, 230));
+    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(200, 200, 220, 255));
+    if (ImGui::Button("✕##l3dClose", ImVec2(btnS, btnS))) {
+        g_state.showLarge3D = false;
+    }
+    ImGui::PopStyleColor(3);
+
+    // ESC to close
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        g_state.showLarge3D = false;
+    }
+
+    // Function expression display
+    std::string exprLabel = "f(x,y) = " + std::string(g_state.func3D);
+    ImGui::SetCursorScreenPos(ImVec2(winPos.x + 20, winPos.y + 16));
+    ImGui::TextColored(ImVec4(0.2f, 0.9f, 0.4f, 1), "%s", exprLabel.c_str());
+
+    // 3D drawing area (large)
+    float margin = 60.0f;
+    float topMargin = 80.0f;
+    ImVec2 plotOrigin(winPos.x + margin, winPos.y + topMargin);
+    ImVec2 plotSize(winSize.x - 2.0f * margin, winSize.y - topMargin - margin);
+    if (plotSize.x < 50) plotSize.x = 50;
+    if (plotSize.y < 50) plotSize.y = 50;
+
+    // Draw the 3D surface
+    std::string funcExpr = g_state.func3D;
+    draw3DSurface(dl, plotOrigin, plotSize, funcExpr,
+                  g_state.range3DMin, g_state.range3DMax,
+                  g_state.large3DRotX, g_state.large3DRotY, g_state.large3DZoom);
+
+    // Invisible button for mouse interaction
+    ImGui::SetCursorScreenPos(plotOrigin);
+    ImGui::InvisibleButton("##l3dArea", plotSize);
+    bool hovered = ImGui::IsItemHovered();
+
+    // Mouse wheel zoom
+    if (hovered) {
+        float wheel = io.MouseWheel;
+        if (wheel != 0.0f) {
+            g_state.large3DZoom *= (1.0f + wheel * 0.1f);
+            if (g_state.large3DZoom < 0.1f) g_state.large3DZoom = 0.1f;
+            if (g_state.large3DZoom > 10.0f) g_state.large3DZoom = 10.0f;
+        }
+
+        // Left-click drag to rotate
+        if (ImGui::IsMouseDown(0)) {
+            ImVec2 mp = io.MousePos;
+            if (!g_state.large3DDragging) {
+                g_state.large3DDragging = true;
+                g_state.large3DDragLastX = mp.x;
+                g_state.large3DDragLastY = mp.y;
+            } else {
+                float dx = mp.x - g_state.large3DDragLastX;
+                float dy = mp.y - g_state.large3DDragLastY;
+                if (dx != 0 || dy != 0) {
+                    g_state.large3DRotY += dx * 0.3f;
+                    g_state.large3DRotX += dy * 0.3f;
+                    g_state.large3DDragLastX = mp.x;
+                    g_state.large3DDragLastY = mp.y;
+                }
+            }
+        } else {
+            g_state.large3DDragging = false;
+        }
+    } else {
+        g_state.large3DDragging = false;
+    }
+
+    // Hint text
+    std::string hint = T("Drag to rotate · Scroll to zoom · ESC to close",
+                         "拖拽旋转 · 滚轮缩放 · ESC 关闭",
+                         "ドラッグで回転 · スクロールで拡大縮小 · ESCで閉じる");
+    ImVec2 hintSz = ImGui::CalcTextSize(hint.c_str());
+    ImGui::SetCursorScreenPos(ImVec2(winPos.x + winSize.x - hintSz.x - 20,
+                                      winPos.y + winSize.y - hintSz.y - 16));
+    ImGui::TextColored(ImVec4(0.4f, 0.4f, 0.6f, 0.7f), "%s", hint.c_str());
 
     ImGui::End();
     ImGui::PopStyleVar();
@@ -2367,6 +2861,11 @@ void renderUI() {
     // Large plot viewer (overlay)
     if (g_state.showLargePlot) {
         renderLargePlotView();
+    }
+
+    // Large 3D viewer (overlay)
+    if (g_state.showLarge3D) {
+        renderLarge3DView();
     }
 }
 

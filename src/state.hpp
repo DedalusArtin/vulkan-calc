@@ -102,6 +102,7 @@ struct CalcState {
     bool largePlotDragging = false;
     double largePlotLastX = 0, largePlotLastY = 0;
     bool largePlotDirty = true;
+    std::vector<PlotData> largePlotData;  // Stored plot data for large viewer
 
     // ============================================================
     // Legacy state for Fourier / Complex / Domain coloring
@@ -243,6 +244,21 @@ struct CalcState {
     char exchangeAmountBuf[64] = "1";
     std::string exchangeRateInfo;  // Status message
     std::vector<std::string> exchangeHistory;  // Recent conversion log entries
+    bool exchangeTrendVisible = false;  // Show trend chart
+    std::vector<double> exchangeTrendData;  // Simulated 30-day trend data
+
+    // Integral fill area
+    bool showIntegralFill = false;  // Show filled area under integral
+
+    // 3D large view
+    bool showLarge3D = false;
+    float large3DRotX = 30.0f, large3DRotY = -30.0f;
+    float large3DZoom = 1.0f;
+    bool large3DDragging = false;
+    float large3DDragLastX = 0, large3DDragLastY = 0;
+
+    // Plot mode for calculus independent draw button
+    bool advPlotDirty = true;
 };
 
 // Global instance

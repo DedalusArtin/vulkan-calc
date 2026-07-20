@@ -175,6 +175,8 @@ void calcToggleLang();
 // Currency exchange rate functions
 // ============================================================
 bool fetchExchangeRates();
+bool saveExchangeRatesCache();
+bool loadExchangeRatesCache();
 double convertCurrency(double amount, const std::string& from, const std::string& to);
 std::string formatExchangeRate(double rate);
 

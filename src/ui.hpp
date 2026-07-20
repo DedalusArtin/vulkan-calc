@@ -74,3 +74,6 @@ void renderBootScreen();
 
 // Large plot viewer (full-screen expandable plot)
 void renderLargePlotView();
+
+// Large 3D viewer (full-screen expandable 3D surface)
+void renderLarge3DView();
