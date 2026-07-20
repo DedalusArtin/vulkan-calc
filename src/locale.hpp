@@ -28,6 +28,20 @@ inline std::string execShell(const char* cmd) {
     return "";
 }
 
+// Helper: run a shell command and return ALL output (for JSON responses etc.)
+inline std::string execShellAll(const char* cmd) {
+    std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
+    if (!pipe) return "";
+    std::string result;
+    char buf[4096];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof(buf) - 1, pipe.get())) > 0) {
+        buf[n] = '\0';
+        result += buf;
+    }
+    return result;
+}
+
 // Angle mode display strings
 inline const char* angleModeStr(AngleMode m) {
     switch (m) {

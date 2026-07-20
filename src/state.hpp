@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <deque>
+#include <map>
 
 // ============================================================
 // Language
@@ -198,6 +199,19 @@ struct CalcState {
     std::string extResult;
     int extSelected = 0;
     std::vector<CalcExtension> extensions; // Populated at init
+
+    // ============================================================
+    // Exchange rate / Currency converter
+    // ============================================================
+    std::map<std::string, double> exchangeRates;  // Currency → rate relative to USD
+    time_t exchangeRateTime = 0;  // Last successful fetch timestamp (0 = never)
+    int exchangeFromIdx = 0;  // Source currency Combo index
+    int exchangeToIdx = 1;    // Target currency Combo index
+    double exchangeAmount = 1.0;
+    double exchangeResult = 0.0;
+    char exchangeAmountBuf[64] = "1";
+    std::string exchangeRateInfo;  // Status message
+    std::vector<std::string> exchangeHistory;  // Recent conversion log entries
 };
 
 // Global instance

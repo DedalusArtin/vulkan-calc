@@ -371,6 +371,26 @@ void renderButtons() {
 // Top bar
 // ============================================================
 void renderTopBar() {
+    // --- Language toggle button (leftmost) ---
+    const char* langLabel;
+    ImU32 langCol;
+    switch (g_state.lang) {
+        case LANG_EN: langLabel = "EN";  langCol = COL_BTN_FUNC; break;
+        case LANG_ZH: langLabel = "中文"; langCol = COL_BTN_FUNC; break;
+        case LANG_JA: langLabel = "日本語"; langCol = COL_BTN_FUNC; break;
+        default:      langLabel = "EN";  langCol = COL_BTN_TOOL; break;
+    }
+    if (styledButton(langLabel, langCol, COL_BTN_TOOL_H, COL_BTN_TOOL_A, ImVec2(52, 26))) {
+        calcToggleLang();
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", T("Switch language: EN / 中文 / 日本語",
+                                  "切换语言: EN / 中文 / 日本語",
+                                  "言語切替: EN / 中文 / 日本語"));
+    }
+
+    ImGui::SameLine(0, 4);
+
     // Angle mode toggle
     const char* amStr = angleModeStr(g_state.angleMode);
     if (styledButton(amStr, COL_BTN_TOOL, COL_BTN_TOOL_H, COL_BTN_TOOL_A, ImVec2(52, 26))) {

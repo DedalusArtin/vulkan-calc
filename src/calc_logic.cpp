@@ -8,6 +8,7 @@
 #include <map>
 #include <algorithm>
 #include <functional>
+#include <ctime>
 
 // Apply angle mode to trig function calls in expression
 std::string applyAngleMode(const std::string& expr, AngleMode mode) {
@@ -416,19 +417,19 @@ void calcKeyboardInput(int key, int mods) {
     }
 
     // Enter / = 
-    if (key == '\n' || key == '\r' || key == '=') {
+    if (key == 257 || key == '=') { // GLFW_KEY_ENTER = 257
         calcEvaluate();
         return;
     }
 
     // Backspace
-    if (key == 263) { // GLFW_KEY_BACKSPACE
+    if (key == 259) { // GLFW_KEY_BACKSPACE = 259
         calcDelete();
         return;
     }
 
     // ESC = AC
-    if (key == 256) { // GLFW_KEY_ESCAPE
+    if (key == 256) { // GLFW_KEY_ESCAPE = 256
         calcClear();
         return;
     }
@@ -973,7 +974,7 @@ const char* extCurrency(const char* input) {
     double amount = 0;
     std::string in = input;
     // Remove spaces and parse
-    std::string numStr, currency;
+    std::string numStr, currency, toCurrency;
     size_t i = 0;
     while (i < in.size() && (std::isspace((unsigned char)in[i]) || in[i] == '\"')) i++;
     while (i < in.size() && (std::isdigit((unsigned char)in[i]) || in[i] == '.')) {
@@ -983,40 +984,113 @@ const char* extCurrency(const char* input) {
     while (i < in.size() && std::isalpha((unsigned char)in[i])) {
         currency += std::toupper((unsigned char)in[i]); i++;
     }
+    // Optional "to" target (e.g. "100 USD to CNY")
+    while (i < in.size() && (std::isspace((unsigned char)in[i]) || in[i] == '\"')) i++;
+    // Skip "to" or "in" or "->"
+    if (i + 2 <= in.size() &&
+        (in.substr(i, 2) == "to" || in.substr(i, 2) == "in")) {
+        i += 2;
+    } else if (i + 1 < in.size() && in[i] == '-' && in[i+1] == '>') {
+        i += 2;
+    }
+    while (i < in.size() && (std::isspace((unsigned char)in[i]) || in[i] == '\"')) i++;
+    while (i < in.size() && std::isalpha((unsigned char)in[i])) {
+        toCurrency += std::toupper((unsigned char)in[i]); i++;
+    }
+
     if (numStr.empty()) {
-        result = "格式: 金额 货币(USD/CNY/EUR/JPY), 如 \"100 USD\"";
+        result = "格式: 金额 货币 [to 目标货币], 如 \"100 USD to CNY\"";
         return result.c_str();
     }
     try { amount = std::stod(numStr); } catch (...) {
         result = "无效金额";
         return result.c_str();
     }
-    // Approximate exchange rates (示例汇率)
+
+    // --- Use live rates if available ---
+    bool useLive = !g_state.exchangeRates.empty();
+    double inUSD = 0;
+
+    if (useLive) {
+        auto itUSD = g_state.exchangeRates.find(currency);
+        if (itUSD != g_state.exchangeRates.end()) {
+            inUSD = amount / itUSD->second;
+        } else {
+            useLive = false;
+        }
+    }
+
+    // Fallback hardcoded rates
     const double usd_to_cny = 7.24;
     const double eur_to_usd = 1.08;
     const double jpy_to_usd = 0.0067;
     const double gbp_to_usd = 1.27;
 
-    double inUSD = 0;
-    if (currency == "USD") inUSD = amount;
-    else if (currency == "CNY") inUSD = amount / usd_to_cny;
-    else if (currency == "EUR") inUSD = amount * eur_to_usd;
-    else if (currency == "JPY") inUSD = amount * jpy_to_usd;
-    else if (currency == "GBP") inUSD = amount * gbp_to_usd;
-    else {
-        result = "支持的货币: USD, CNY, EUR, JPY, GBP";
-        return result.c_str();
+    if (!useLive) {
+        if (currency == "USD") inUSD = amount;
+        else if (currency == "CNY") inUSD = amount / usd_to_cny;
+        else if (currency == "EUR") inUSD = amount * eur_to_usd;
+        else if (currency == "JPY") inUSD = amount * jpy_to_usd;
+        else if (currency == "GBP") inUSD = amount * gbp_to_usd;
+        else {
+            result = "支持的货币: USD, CNY, EUR, JPY, GBP (或联网获取实时汇率)";
+            return result.c_str();
+        }
     }
 
     std::ostringstream oss;
     oss.precision(2);
     oss << std::fixed;
-    oss << amount << " " << currency << " =\n";
-    oss << "  USD $" << inUSD << "\n";
-    oss << "  CNY ¥" << (inUSD * usd_to_cny) << "\n";
-    oss << "  EUR €" << (inUSD / eur_to_usd) << "\n";
-    oss << "  JPY ¥" << (inUSD / jpy_to_usd) << "\n";
-    oss << "  GBP £" << (inUSD / gbp_to_usd);
+    oss << amount << " " << currency;
+    if (!toCurrency.empty()) {
+        // Convert to specific target
+        if (useLive) {
+            auto itTo = g_state.exchangeRates.find(toCurrency);
+            if (itTo != g_state.exchangeRates.end()) {
+                double conv = inUSD * itTo->second;
+                oss << " = " << conv << " " << toCurrency;
+                oss << "\n(1 " << currency << " = " << (itTo->second / g_state.exchangeRates[currency]) << " " << toCurrency << ")";
+            } else {
+                oss << ": 不支持 " << toCurrency;
+            }
+        } else {
+            oss << " to " << toCurrency;
+            // Fallback with approximate
+            double rate = 1;
+            if (currency == "USD" && toCurrency == "CNY") rate = usd_to_cny;
+            else if (currency == "CNY" && toCurrency == "USD") rate = 1.0/usd_to_cny;
+            else if (currency == "USD" && toCurrency == "EUR") rate = 1.0/eur_to_usd;
+            else if (currency == "EUR" && toCurrency == "USD") rate = eur_to_usd;
+            else { oss << "\n(使用近似汇率)"; }
+            oss << "\n= " << (amount * rate) << " " << toCurrency;
+        }
+    } else {
+        oss << " (USD $" << inUSD << ") =";
+        if (currency == "USD") {
+            if (useLive) {
+                oss << "\n  CNY ¥" << (inUSD * g_state.exchangeRates["CNY"]);
+                oss << "\n  EUR €" << (inUSD * g_state.exchangeRates["EUR"]);
+                oss << "\n  JPY ¥" << (inUSD * g_state.exchangeRates["JPY"]);
+                oss << "\n  GBP £" << (inUSD * g_state.exchangeRates["GBP"]);
+                oss << "\n  KRW ₩" << (inUSD * g_state.exchangeRates["KRW"]);
+                oss << "\n  HKD HK$" << (inUSD * g_state.exchangeRates["HKD"]);
+            } else {
+                oss << "\n  CNY ¥" << (inUSD * usd_to_cny);
+                oss << "\n  EUR €" << (inUSD / eur_to_usd);
+                oss << "\n  JPY ¥" << (inUSD / jpy_to_usd);
+                oss << "\n  GBP £" << (inUSD / gbp_to_usd);
+            }
+        } else {
+            oss << "\n  USD $" << inUSD;
+            if (useLive && currency != "CNY")
+                oss << "\n  CNY ¥" << (inUSD * g_state.exchangeRates["CNY"]);
+            else if (!useLive)
+                oss << "\n  CNY ¥" << (inUSD * usd_to_cny);
+        }
+    }
+    if (useLive) {
+        oss << "\n\n(实时汇率)";
+    }
     result = oss.str();
     return result.c_str();
 }
@@ -1136,4 +1210,156 @@ void initExtensions() {
         "100C",
         "temp"
     });
+}
+
+// ============================================================
+// Currency display data
+// ============================================================
+const char* g_currencyCodes[] = {
+    "USD", "EUR", "GBP", "JPY", "CNY", "KRW", "HKD", "TWD",
+    "AUD", "CAD", "CHF", "SGD", "INR", "RUB", "BRL"
+};
+const char* g_currencyNames[] = {
+    "美元", "欧元", "英镑", "日元", "人民币", "韩元", "港币", "台币",
+    "澳元", "加元", "瑞士法郎", "新加坡元", "印度卢比", "卢布", "巴西雷亚尔"
+};
+const int g_currencyCount = 15;
+
+// ============================================================
+// Language toggle: EN → ZH → JA → EN
+// ============================================================
+void calcToggleLang() {
+    switch (g_state.lang) {
+        case LANG_EN: g_state.lang = LANG_ZH; break;
+        case LANG_ZH: g_state.lang = LANG_JA; break;
+        case LANG_JA: g_state.lang = LANG_EN; break;
+    }
+}
+
+// ============================================================
+// Currency exchange rate functions
+// ============================================================
+
+// Fetch exchange rates from open.er-api.com (free, no API key needed)
+bool fetchExchangeRates() {
+    std::string json = execShellAll(
+        "curl -s --connect-timeout 5 --max-time 10 "
+        "\"https://open.er-api.com/v6/latest/USD\""
+    );
+
+    if (json.empty()) {
+        if (g_state.exchangeRates.empty()) {
+            g_state.exchangeRateInfo = T(
+                "Network unavailable - cannot fetch rates",
+                "网络不可用 - 无法获取汇率",
+                "ネットワーク不可 - レート取得不可"
+            );
+        } else {
+            g_state.exchangeRateInfo = T(
+                "Network unavailable - using cached rates",
+                "网络不可用 - 使用缓存汇率",
+                "ネットワーク不可 - キャッシュを使用"
+            );
+        }
+        return false;
+    }
+
+    // Parse JSON: find "rates": { block
+    auto ratesPos = json.find("\"rates\"");
+    if (ratesPos == std::string::npos) {
+        g_state.exchangeRateInfo = T(
+            "Failed to parse exchange rate data",
+            "解析汇率数据失败",
+            "為替レートデータの解析に失敗"
+        );
+        return false;
+    }
+
+    auto bracePos = json.find('{', ratesPos);
+    if (bracePos == std::string::npos) return false;
+
+    // Clear old rates
+    g_state.exchangeRates.clear();
+
+    // Parse each "CODE": value pair
+    size_t pos = bracePos + 1;
+    while (pos < json.size()) {
+        // Skip whitespace, commas, newlines
+        while (pos < json.size() && (json[pos] == ' ' || json[pos] == ',' ||
+               json[pos] == '\n' || json[pos] == '\r' || json[pos] == '\t'))
+            pos++;
+        if (pos >= json.size() || json[pos] == '}') break;
+
+        // Find opening quote of currency code
+        if (json[pos] != '"') { pos++; continue; }
+        pos++;
+        size_t codeStart = pos;
+        while (pos < json.size() && json[pos] != '"') pos++;
+        if (pos >= json.size()) break;
+        std::string code = json.substr(codeStart, pos - codeStart);
+        pos++; // past closing quote
+
+        // Skip colon and whitespace
+        while (pos < json.size() && (json[pos] == ' ' || json[pos] == ':')) pos++;
+
+        // Parse value
+        char* end = nullptr;
+        double rate = std::strtod(json.c_str() + pos, &end);
+        if (end != json.c_str() + pos) {
+            g_state.exchangeRates[code] = rate;
+            pos = end - json.c_str();
+        } else {
+            pos++;
+        }
+    }
+
+    if (g_state.exchangeRates.empty()) {
+        g_state.exchangeRateInfo = T(
+            "No exchange rates found in response",
+            "响应中未找到汇率数据",
+            "応答に為替レートデータが見つかりません"
+        );
+        return false;
+    }
+
+    // Store timestamp
+    g_state.exchangeRateTime = time(nullptr);
+
+    // Format time string
+    char timeBuf[64];
+    struct tm* t = localtime(&g_state.exchangeRateTime);
+    strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%d %H:%M:%S", t);
+
+    g_state.exchangeRateInfo = T(
+        "Rates updated at: ", "汇率更新时间: ", "レート更新時刻: "
+    );
+    g_state.exchangeRateInfo += timeBuf;
+
+    return true;
+}
+
+// Convert currency: amount in 'from' currency → result in 'to' currency
+double convertCurrency(double amount, const std::string& from, const std::string& to) {
+    if (g_state.exchangeRates.empty()) return 0.0;
+
+    auto itFrom = g_state.exchangeRates.find(from);
+    auto itTo = g_state.exchangeRates.find(to);
+
+    if (itFrom == g_state.exchangeRates.end() || itTo == g_state.exchangeRates.end())
+        return 0.0;
+
+    // Convert: from → USD → to
+    // Rates are relative to USD: rate = value of 1 USD in that currency
+    // So: amount in USD = amount_from / rate_from
+    // Then: amount in to = usd_amount * rate_to
+    double inUSD = amount / itFrom->second;
+    return inUSD * itTo->second;
+}
+
+// Format exchange rate for display
+std::string formatExchangeRate(double rate) {
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(6);
+    oss << rate;
+    return oss.str();
 }

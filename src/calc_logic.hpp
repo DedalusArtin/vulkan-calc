@@ -165,3 +165,20 @@ const char* extTemperature(const char* input);
 
 // Initialize built-in extensions
 void initExtensions();
+
+// ============================================================
+// Language toggle
+// ============================================================
+void calcToggleLang();
+
+// ============================================================
+// Currency exchange rate functions
+// ============================================================
+bool fetchExchangeRates();
+double convertCurrency(double amount, const std::string& from, const std::string& to);
+std::string formatExchangeRate(double rate);
+
+// Currency display data (shared with ui.cpp)
+extern const char* g_currencyCodes[];
+extern const char* g_currencyNames[];
+extern const int g_currencyCount;
