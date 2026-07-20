@@ -114,28 +114,32 @@ set(PROJECT_HDR
 # Create executable
 # ============================================================
 if(WIN32)
-    # Try to find a resource compiler
-    find_program(WINDRES windres)
-    find_program(RC_COMPILER rc)
+    # On MSVC, prefer rc.exe (MSVC resource compiler) over MinGW windres
+    if(MSVC)
+        find_program(RC_COMPILER rc)
+    endif()
+    if(NOT RC_COMPILER)
+        find_program(WINDRES windres)
+    endif()
 
-    if(WINDRES)
-        # MinGW-style windres
-        set(RES_OUT ${CMAKE_CURRENT_BINARY_DIR}/resources.res)
-        add_custom_command(
-            OUTPUT ${RES_OUT}
-            COMMAND ${WINDRES} -i ${RC_SRC} -o ${RES_OUT} --define _WIN32
-            DEPENDS ${RC_SRC}
-            COMMENT "Compiling resources (windres)"
-        )
-        add_executable(vulkan_calc ${PROJECT_SRC} ${PROJECT_HDR} ${IMGUI_SRC} ${RES_OUT})
-    elseif(RC_COMPILER)
-        # MSVC-style rc.exe
+    if(RC_COMPILER)
+        # MSVC-style rc.exe (preferred for MSVC builds)
         set(RES_OUT ${CMAKE_CURRENT_BINARY_DIR}/resources.res)
         add_custom_command(
             OUTPUT ${RES_OUT}
             COMMAND ${RC_COMPILER} /fo ${RES_OUT} ${RC_SRC}
             DEPENDS ${RC_SRC}
             COMMENT "Compiling resources (rc.exe)"
+        )
+        add_executable(vulkan_calc ${PROJECT_SRC} ${PROJECT_HDR} ${IMGUI_SRC} ${RES_OUT})
+    elseif(WINDRES)
+        # MinGW-style windres
+        set(RES_OUT ${CMAKE_CURRENT_BINARY_DIR}/resources.res)
+        add_custom_command(
+            OUTPUT ${RES_OUT}
+            COMMAND ${WINDRES} -i ${RC_SRC} -o ${RES_OUT}
+            DEPENDS ${RC_SRC}
+            COMMENT "Compiling resources (windres)"
         )
         add_executable(vulkan_calc ${PROJECT_SRC} ${PROJECT_HDR} ${IMGUI_SRC} ${RES_OUT})
     else()

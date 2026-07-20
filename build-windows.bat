@@ -16,10 +16,18 @@ echo ========================================
 
 REM Check Vulkan SDK
 if "%VULKAN_SDK%"=="" (
-    echo [ERROR] Vulkan SDK not found.
-    echo   Download from: https://vulkan.lunarg.com/sdk/home
-    pause
-    exit /b 1
+    if exist "E:\Programming\vulkan\1.4.350.0" (
+        set VULKAN_SDK=E:\Programming\vulkan\1.4.350.0
+    ) else if exist "C:\VulkanSDK" (
+        set VULKAN_SDK=C:\VulkanSDK
+    ) else if exist "C:\VulkanSDK\1.4.350.0" (
+        set VULKAN_SDK=C:\VulkanSDK\1.4.350.0
+    ) else (
+        echo [ERROR] Vulkan SDK not found.
+        echo   Download from: https://vulkan.lunarg.com/sdk/home
+        pause
+        exit /b 1
+    )
 )
 echo [OK] Vulkan SDK: %VULKAN_SDK%
 
@@ -27,11 +35,12 @@ REM Check vcpkg
 if "%VCPKG_ROOT%"=="" (
     if exist "C:\vcpkg" (
         set VCPKG_ROOT=C:\vcpkg
+    ) else if exist "E:\Programming\vcpkg" (
+        set VCPKG_ROOT=E:\Programming\vcpkg
     ) else if exist "%LOCALAPPDATA%\vcpkg" (
         set VCPKG_ROOT=%LOCALAPPDATA%\vcpkg
     ) else (
         echo [WARN] vcpkg not found. Installing glfw3 and glm may fail.
-        echo   Install vcpkg from: https://github.com/microsoft/vcpkg
     )
 )
 if not "%VCPKG_ROOT%"=="" (
@@ -42,7 +51,7 @@ REM Create build dir
 if not exist "%BUILD_DIR%" mkdir "%BUILD_DIR%"
 cd /d "%BUILD_DIR%"
 
-REM Configure with CMake (console subsystem for GLFW debug output)
+REM Configure with CMake
 echo [..] Configuring with CMake...
 set CMAKE_ARGS=-G "Visual Studio 17 2022" -A x64 ^
     -DCMAKE_PREFIX_PATH="%VULKAN_SDK%" ^
@@ -77,8 +86,8 @@ copy /Y "%BUILD_DIR%\Release\vulkan_calc.exe" "%OUTPUT_DIR%\"
 copy /Y "%PROJECT_DIR%\icon\app.ico" "%OUTPUT_DIR%\"
 
 REM Copy required DLLs (from Vulkan SDK)
-if exist "%VULKAN_SDK%\bin\vulkan-1.dll" (
-    copy /Y "%VULKAN_SDK%\bin\vulkan-1.dll" "%OUTPUT_DIR%\"
+if exist "%VULKAN_SDK%\Bin\vulkan-1.dll" (
+    copy /Y "%VULKAN_SDK%\Bin\vulkan-1.dll" "%OUTPUT_DIR%\"
 )
 
 echo ========================================
