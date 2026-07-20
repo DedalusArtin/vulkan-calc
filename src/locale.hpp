@@ -16,6 +16,21 @@ inline const char* T(const char* en, const char* zh, const char* ja) {
 }
 
 // Helper: run a shell command and return first line (or empty)
+#ifdef _MSC_VER
+static std::string execShell(const char* cmd) {
+    FILE* f = _popen(cmd, "r");
+    if (!f) return "";
+    char buf[256];
+    std::string result;
+    if (fgets(buf, sizeof(buf), f)) {
+        size_t len = strlen(buf);
+        if (len > 0 && buf[len-1] == '\n') buf[len-1] = '\0';
+        result = buf;
+    }
+    _pclose(f);
+    return result;
+}
+#else
 inline std::string execShell(const char* cmd) {
     std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
     if (!pipe) return "";
@@ -27,20 +42,33 @@ inline std::string execShell(const char* cmd) {
     }
     return "";
 }
+#endif
 
-// Helper: run a shell command and return ALL output (for JSON responses etc.)
+// Helper: read all output from a shell command
+#ifdef _MSC_VER
+static std::string execShellAll(const char* cmd) {
+    FILE* f = _popen(cmd, "r");
+    if (!f) return "";
+    std::string result;
+    char linebuf[4096];
+    while (fgets(linebuf, sizeof(linebuf), f)) {
+        result += linebuf;
+    }
+    _pclose(f);
+    return result;
+}
+#else
 inline std::string execShellAll(const char* cmd) {
     std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
     if (!pipe) return "";
     std::string result;
-    char buf[4096];
-    size_t n;
-    while ((n = fread(buf, 1, sizeof(buf) - 1, pipe.get())) > 0) {
-        buf[n] = '\0';
-        result += buf;
+    char linebuf[4096];
+    while (fgets(linebuf, sizeof(linebuf), pipe.get())) {
+        result += linebuf;
     }
     return result;
 }
+#endif
 
 // Angle mode display strings
 inline const char* angleModeStr(AngleMode m) {

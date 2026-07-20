@@ -25,9 +25,20 @@ if(MSVC)
 endif()
 
 # ============================================================
-# Find Vulkan
+# Find Vulkan (with explicit path fallback for Windows)
 # ============================================================
-find_package(Vulkan REQUIRED)
+find_package(Vulkan QUIET)
+if(NOT Vulkan_FOUND)
+    # Fallback: try VULKAN_SDK env var or explicit paths
+    if(DEFINED ENV{VULKAN_SDK})
+        set(Vulkan_INCLUDE_DIR "$ENV{VULKAN_SDK}/Include")
+        set(Vulkan_LIBRARY "$ENV{VULKAN_SDK}/Lib/vulkan-1.lib")
+        set(Vulkan_FOUND TRUE)
+        message(STATUS "Vulkan SDK found via VULKAN_SDK: $ENV{VULKAN_SDK}")
+    else()
+        message(FATAL_ERROR "Vulkan SDK not found. Set VULKAN_SDK env var.")
+    endif()
+endif()
 
 # ============================================================
 # Find glfw3
