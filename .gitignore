@@ -28,3 +28,4 @@ compile_commands.json
 # Windows-specific
 *.user
 *.suo
+sys
