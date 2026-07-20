@@ -963,13 +963,13 @@ void renderAdvancedTabContent() {
         ImGui::Text("%s", T("Expression f(x) =", "表达式 f(x) =", "式 f(x) ="));
 
         char buf[1024];
-        strncpy(buf, g_state.display.empty() ? "sin(x)" : g_state.display.c_str(),
+        strncpy(buf, g_state.advExpr.empty() ? "sin(x)" : g_state.advExpr.c_str(),
                 sizeof(buf) - 1);
         buf[sizeof(buf) - 1] = 0;
         ImGui::PushItemWidth(-1);
         if (ImGui::InputText("##advExpr", buf, sizeof(buf),
                              ImGuiInputTextFlags_EnterReturnsTrue)) {
-            g_state.display = buf;
+            g_state.advExpr = buf;
         }
         ImGui::PopItemWidth();
 
@@ -978,7 +978,7 @@ void renderAdvancedTabContent() {
 
         // Evaluate button
         if (ImGui::Button(T("Evaluate f(x)##adv", "计算 f(x)##adv", "計算 f(x)##adv"))) {
-            g_state.evaluator.setExpression(g_state.display);
+            g_state.evaluator.setExpression(g_state.advExpr);
             if (g_state.evaluator.valid()) {
                 double v = g_state.evaluator.evaluate(g_state.evalX);
                 std::ostringstream oss;
@@ -995,7 +995,7 @@ void renderAdvancedTabContent() {
         if (ImGui::Button(T("∫ f(x) dx##adv", "定积分 ∫##adv", "定積分 ∫##adv"))) {
             auto r = Integrator::adaptiveSimpson(
                 [&](double x) {
-                    g_state.evaluator.setExpression(g_state.display);
+                    g_state.evaluator.setExpression(g_state.advExpr);
                     return g_state.evaluator.evaluate(x);
                 },
                 g_state.intA, g_state.intB);
@@ -1006,7 +1006,7 @@ void renderAdvancedTabContent() {
             g_state.plotMode = CalcState::PLOT_INTEG;
             g_state.plots = PlotGenerator::generateMultiple(
                 {[&](double x) {
-                    g_state.evaluator.setExpression(g_state.display);
+                    g_state.evaluator.setExpression(g_state.advExpr);
                     return g_state.evaluator.evaluate(x);
                 }},
                 g_state.plotXMin, g_state.plotXMax, 500);
@@ -1023,14 +1023,14 @@ void renderAdvancedTabContent() {
             g_state.plotMode = CalcState::PLOT_DERIV;
             g_state.plots = PlotGenerator::generateMultiple(
                 {[&](double x) {
-                    g_state.evaluator.setExpression(g_state.display);
+                    g_state.evaluator.setExpression(g_state.advExpr);
                     return g_state.evaluator.evaluate(x);
                 }},
                 g_state.plotXMin, g_state.plotXMax, 500);
             auto deriv = [&](double x) {
                 return Differentiator::derivative(
                     [&](double t) {
-                        g_state.evaluator.setExpression(g_state.display);
+                        g_state.evaluator.setExpression(g_state.advExpr);
                         return g_state.evaluator.evaluate(t);
                     },
                     x).value;
@@ -1094,14 +1094,14 @@ void renderAdvancedTabContent() {
             g_state.plotMode = CalcState::PLOT_DERIV;
             g_state.plots = PlotGenerator::generateMultiple(
                 {[&](double x) {
-                    g_state.evaluator.setExpression(g_state.display);
+                    g_state.evaluator.setExpression(g_state.advExpr);
                     return g_state.evaluator.evaluate(x);
                 }},
                 g_state.plotXMin, g_state.plotXMax, 500);
             auto deriv = [&](double x) {
                 return Differentiator::derivative(
                     [&](double t) {
-                        g_state.evaluator.setExpression(g_state.display);
+                        g_state.evaluator.setExpression(g_state.advExpr);
                         return g_state.evaluator.evaluate(t);
                     },
                     x).value;
@@ -1113,7 +1113,7 @@ void renderAdvancedTabContent() {
             g_state.derivZeroPts = findZeroCrossings(deriv, g_state.plotXMin, g_state.plotXMax, 500);
             g_state.derivExtremePts = findLocalExtremes(
                 [&](double x) {
-                    g_state.evaluator.setExpression(g_state.display);
+                    g_state.evaluator.setExpression(g_state.advExpr);
                     return g_state.evaluator.evaluate(x);
                 },
                 g_state.plotXMin, g_state.plotXMax, 500);
@@ -1123,12 +1123,12 @@ void renderAdvancedTabContent() {
             g_state.plotMode = CalcState::PLOT_DERIV;
             g_state.plots = PlotGenerator::generateMultiple(
                 {[&](double x) {
-                    g_state.evaluator.setExpression(g_state.display);
+                    g_state.evaluator.setExpression(g_state.advExpr);
                     return g_state.evaluator.evaluate(x);
                 }},
                 g_state.plotXMin, g_state.plotXMax, 500);
             auto f = [&](double x) {
-                g_state.evaluator.setExpression(g_state.display);
+                g_state.evaluator.setExpression(g_state.advExpr);
                 return g_state.evaluator.evaluate(x);
             };
             auto deriv1 = [&](double x) {
@@ -1201,7 +1201,7 @@ void renderAdvancedTabContent() {
                 // V = π∫[f(x)]²dx
                 auto r = Integrator::adaptiveSimpson(
                     [&](double x) {
-                        g_state.evaluator.setExpression(g_state.display);
+                        g_state.evaluator.setExpression(g_state.advExpr);
                         double fv = g_state.evaluator.evaluate(x);
                         return fv * fv;
                     },
@@ -1210,7 +1210,7 @@ void renderAdvancedTabContent() {
                 oss.precision(6);
                 oss << "V = π * " << r.value << " = " << (std::numbers::pi * r.value);
                 g_state.volResult = oss.str();
-                g_state.volFormula = "V = π∫[" + g_state.display + "]² dx";
+                g_state.volFormula = "V = π∫[" + g_state.advExpr + "]² dx";
             }
         } else if (g_state.volType == 1) {
             // Sphere
@@ -1435,7 +1435,7 @@ void renderAdvancedTabContent() {
         if (ImGui::Button(T("Cauchy ∮##cb", "柯西积分 ∮##cb", "コーシー積分 ∮##cb"))) {
             Complex a(g_state.complexRe, g_state.complexIm);
             auto f = [&](Complex z) -> Complex {
-                g_state.evaluator.setExpression(g_state.display);
+                g_state.evaluator.setExpression(g_state.advExpr);
                 return Complex(g_state.evaluator.evaluate(z.real()), 0);
             };
             auto cr = ComplexAnalysis::cauchyIntegral(f, a, g_state.cauchyRadius);
@@ -1446,7 +1446,7 @@ void renderAdvancedTabContent() {
         if (ImGui::Button(T("Residue##cb", "留数##cb", "留数##cb"))) {
             Complex a(g_state.complexRe, g_state.complexIm);
             auto f = [&](Complex z) -> Complex {
-                g_state.evaluator.setExpression(g_state.display);
+                g_state.evaluator.setExpression(g_state.advExpr);
                 return Complex(g_state.evaluator.evaluate(z.real()), 0);
             };
             auto res = ComplexAnalysis::residue(f, a);

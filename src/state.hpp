@@ -89,8 +89,12 @@ struct CalcState {
     ExpressionEvaluator evaluator;
 
     // ============================================================
-    // Legacy state for Fourier / Complex / Domain coloring
+    // Advanced tab expression (independent from main calculator display)
     // ============================================================
+    std::string advExpr = "sin(x)";
+
+    // ============================================================
+    // Legacy state for Fourier / Complex / Domain coloring
     int fourierTerms = 5;
     int fourierType = 0;
     std::vector<PlotData> fourierPlots;
