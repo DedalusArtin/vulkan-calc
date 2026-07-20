@@ -2740,8 +2740,7 @@ void renderLarge3DView() {
     ImGui::Begin("##large3D", nullptr,
                  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                  ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
-                 ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDecoration |
-                 ImGuiWindowFlags_NoBringToFrontOnFocus);
+                 ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDecoration);
 
     auto* dl = ImGui::GetWindowDrawList();
 

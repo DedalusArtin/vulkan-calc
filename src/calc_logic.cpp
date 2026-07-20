@@ -10,6 +10,9 @@
 #include <functional>
 #include <ctime>
 #include <fstream>
+#ifdef _WIN32
+#include <direct.h>
+#endif
 
 // Apply angle mode to trig function calls in expression
 std::string applyAngleMode(const std::string& expr, AngleMode mode) {
@@ -1417,10 +1420,19 @@ bool fetchExchangeRates() {
 
 // Save exchange rates to cache file
 bool saveExchangeRatesCache() {
-    // Ensure ~/.codex directory exists
+#ifdef _WIN32
+    // Windows: use _mkdir and USERPROFILE
+    const char* homeDir = getenv("USERPROFILE");
+    if (!homeDir) return false;
+    std::string cacheDir = std::string(homeDir) + "/.codex";
+    _mkdir(cacheDir.c_str());
+#else
+    // Linux/WSL: use mkdir and HOME
     system("mkdir -p ~/.codex 2>/dev/null");
-
-    std::string cachePath = std::string(getenv("HOME")) + "/.codex/exchange_rates.json";
+    const char* homeDir = getenv("HOME");
+    if (!homeDir) return false;
+#endif
+    std::string cachePath = std::string(homeDir) + "/.codex/exchange_rates.json";
 
     std::ofstream ofs(cachePath);
     if (!ofs.is_open()) return false;
